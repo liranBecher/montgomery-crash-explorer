@@ -1,0 +1,145 @@
+.mce-app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
+    margin-bottom: 1.25rem;
+    padding: 1.4rem 1.5rem;
+    border: 1px solid #d8e0e7;
+    border-radius: 1rem;
+    background: #ffffff;
+    box-shadow: 0 12px 30px rgba(31, 45, 58, 0.07);
+}
+
+.mce-app-header h1,
+.mce-view-heading h2,
+.mce-card h3 {
+    color: #14202b;
+}
+
+.mce-app-header h1 {
+    margin: 0.1rem 0 0.35rem;
+    font-size: clamp(1.7rem, 3vw, 2.35rem);
+    letter-spacing: -0.035em;
+}
+
+.mce-eyebrow,
+.mce-subtitle,
+.mce-view-heading p,
+.mce-card > p {
+    margin: 0;
+}
+
+.mce-eyebrow {
+    color: #087f78;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+
+.mce-subtitle,
+.mce-view-heading p,
+.mce-card > p,
+.mce-empty-state small {
+    color: #5d6b78;
+}
+
+.mce-status,
+.mce-card-badge {
+    flex: 0 0 auto;
+    border: 1px solid #b9ddd9;
+    border-radius: 999px;
+    color: #087f78;
+    background: #eaf7f5;
+    font-size: 0.75rem;
+    font-weight: 650;
+}
+
+.mce-status {
+    padding: 0.45rem 0.7rem;
+}
+
+.mce-view-heading {
+    padding: 1.2rem 0 0.8rem;
+}
+
+.mce-view-heading h2 {
+    margin: 0 0 0.35rem;
+    font-size: clamp(1.25rem, 2vw, 1.6rem);
+    letter-spacing: -0.02em;
+}
+
+.mce-card {
+    display: flex;
+    flex-direction: column;
+    margin: 0.5rem 0;
+    padding: 1rem;
+    border: 1px solid #d8e0e7;
+    border-radius: 0.8rem;
+    background: #ffffff;
+    box-shadow: 0 6px 18px rgba(31, 45, 58, 0.04);
+}
+
+.mce-card-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.35rem;
+}
+
+.mce-card-heading h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 650;
+}
+
+.mce-card-badge {
+    padding: 0.25rem 0.5rem;
+}
+
+.mce-empty-state {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    min-height: 8rem;
+    margin: 1rem 0;
+    border: 1px dashed #b9c5cf;
+    border-radius: 0.65rem;
+    color: #344451;
+    background: #f8fafc;
+    text-align: center;
+}
+
+.mce-empty-icon {
+    width: 2.4rem;
+    height: 2.4rem;
+    margin-bottom: 0.25rem;
+    border: 0.35rem solid #d9f1ee;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 2px #69aaa4;
+}
+
+.mce-interaction-note {
+    padding-top: 0.75rem;
+    border-top: 1px solid #e7ecef;
+    color: #087f78 !important;
+    font-size: 0.8rem;
+}
+
+@media (max-width: 700px) {
+    .mce-app-header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1.1rem;
+    }
+
+    .mce-card {
+        min-height: 18rem !important;
+    }
+}

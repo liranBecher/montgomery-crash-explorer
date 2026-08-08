@@ -1,5 +1,13 @@
 import streamlit as st
 
+from ui.components import load_styles, render_app_header, render_sidebar
+from ui.views import (
+    render_alcohol_enforcement_view,
+    render_responder_view,
+    render_safety_view,
+    render_vehicle_view,
+)
+
 
 st.set_page_config(
     page_title="Montgomery County Crash Explorer",
@@ -7,29 +15,27 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("Montgomery County Crash Explorer")
-st.caption("Interactive views for crash patterns, response coverage, enforcement priorities, and vehicles.")
+load_styles()
+render_app_header()
+render_sidebar()
 
-with st.sidebar:
-    st.header("Filters")
-    st.info("Shared filters will be added after the processed-data contract is finalized.")
-
-hotspots, responders, owls, vehicles = st.tabs(
-    ["Safety hotspots", "First responders", "Police OWLs", "Vehicles & injuries"]
+safety, responders, breathalyzers, vehicles = st.tabs(
+    [
+        "Safety Hotspots",
+        "First Responders",
+        "Police Breathalyzers",
+        "Vehicles & Injuries",
+    ]
 )
 
-with hotspots:
-    st.header("When, where, and under which conditions do crashes occur?")
-    st.info("Map, timeline, and condition views go here.")
+with safety:
+    render_safety_view()
 
 with responders:
-    st.header("Where are crash-response coverage gaps?")
-    st.info("Existing stations, severe-crash hotspots, and coverage views go here.")
+    render_responder_view()
 
-with owls:
-    st.header("Where should police OWLs be prioritized?")
-    st.warning("Define what an OWL is and its placement objective before implementing this view.")
+with breathalyzers:
+    render_alcohol_enforcement_view()
 
 with vehicles:
-    st.header("How do vehicle make and age relate to driver injury severity?")
-    st.info("Vehicle-age and manufacturer views go here.")
+    render_vehicle_view()

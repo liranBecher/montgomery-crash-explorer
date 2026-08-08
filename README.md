@@ -17,13 +17,14 @@ python -m pip install -r requirements.txt
 streamlit run app.py
 ```
 
-The skeleton runs without data.
+The layout prototype runs without data. Its controls remain disabled until the
+processed-data contract is finalized.
 
 ## Planned views
 
 1. Safety hotspots by time, place, weather, road type, and light conditions
 2. Crash-response coverage around existing first-responder locations
-3. Police OWL priority locations after the device and objective are defined
+3. Priority locations and times for police breathalyzer alcohol-level enforcement
 4. Vehicle make/age and driver injury severity
 
 ## Tech stack

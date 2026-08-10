@@ -30,10 +30,75 @@ For a web-based project:
 - The system must work in a browser from any computer.
 - Submit a working link.
 - Use multiple views and interaction to explore the data from several
-  perspectives. Connecting views through linking and brushing is recommended.
+  perspectives. For a good-or-better project, the views should be connected
+  through linking and brushing so a selection in one view updates the others.
 
 The Tableau-only requirement of at least two dashboards, or one dashboard and
 one story, does not apply to this Streamlit project.
+
+## Functional and interaction requirements
+
+The following course guidance expands the formal brief into concrete design
+and implementation requirements.
+
+### Full interactivity
+
+- The system must be dynamic and interactive. It must not consist only of
+  static chart images.
+- The visualization system must be organized around a clear research question
+  or defined analytical goal, rather than an unrelated collection of charts.
+- Multiple visualizations must be connected through brushing and linking. For
+  example, selecting a map region or time interval should update the other
+  relevant views automatically.
+
+### Shneiderman's mantra
+
+The dashboard should support a gradual exploration workflow:
+
+1. **Overview first:** present the overall picture first, normally in the
+   upper-left or otherwise most prominent part of the interface.
+2. **Zoom and filter:** provide interactive controls, such as sliders, date
+   ranges, category filters, map zoom, or area selectors, for focusing on
+   relevant subsets.
+3. **Details on demand:** reveal exact values and raw details through tooltips,
+   focused selections, or drill-down interactions instead of showing all
+   details at once.
+
+### Interface and chart presentation
+
+- The interface should be professional, attractive, and easy to use. The
+  course guidance emphasizes the principle "What is beautiful is usable."
+- Every chart must have a clear title and accurate axis labels, including units
+  where relevant.
+- Every color encoding that requires interpretation must have an explicit,
+  clearly labeled legend.
+- Labels, legends, axes, and tooltips must use consistent terminology and
+  accurately describe the underlying data.
+
+## Visualization correctness constraints
+
+These constraints should be treated as design-review checks for every chart:
+
+- Do not include uninformative charts that are flat, show no meaningful
+  variation, or provide no analytical value. Try different cuts, aggregations,
+  and comparisons until the view supports a useful finding.
+- Use line charts only for continuous ordered data, especially time series. Do
+  not connect unrelated categorical values with a line.
+- Limit categorical color palettes to approximately 6-8 distinguishable
+  colors. Use grouping, filtering, small multiples, or another encoding when
+  there are more categories.
+- Bar charts and stacked bar charts must start their quantitative axis at zero.
+  A non-zero baseline may be considered for line or point charts only when it
+  is clearly justified and does not distort interpretation.
+- Use stacked bars only when the segments represent parts of a whole. For a
+  normalized stacked bar, the segments must sum to 100%.
+- Avoid dual quantitative axes. They are prohibited in most cases because they
+  can create misleading apparent correlations and intersections.
+- Do not use 3D charts. Perspective distorts heights, areas, and comparisons.
+- Build an exploratory visualization system, not a static explanatory poster
+  or infographic.
+- Time axes must run from left to right, from earlier to later, including in a
+  Hebrew-language interface.
 
 ## Data preparation
 
@@ -52,6 +117,8 @@ one story, does not apply to this Streamlit project.
   September.
 
 ## Submission and report
+
+Report Link [Link](https://docs.google.com/document/d/1lxUd-5fLB0UovdxjrY3h26qI2YNxPsfp/edit?usp=sharing&ouid=114896909654094115564&rtpof=true&sd=true)
 
 - Put a working project link at the beginning of the report.
 - Submit the report through the submission box of one team member.
@@ -91,11 +158,13 @@ one story, does not apply to this Streamlit project.
   solution.
 - The scope goes beyond a collection of simple charts.
 - Data is shown interactively through multiple perspectives and views.
-- Linking and brushing between views is recommended.
+- Linking and brushing between views is expected for a strong submission.
 
 ### Aesthetics - 15%
 
 - The application should look professional and attractive.
+- Visual polish should support perceived usability as well as appearance,
+  following the course principle "What is beautiful is usable."
 
 ### Report - 15%
 

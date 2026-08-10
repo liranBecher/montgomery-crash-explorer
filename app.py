@@ -1,6 +1,11 @@
 import streamlit as st
 
-from ui.components import load_styles, render_app_header, render_sidebar
+from ui.components import (
+    load_styles,
+    render_app_header,
+    render_exploration_guide,
+    render_sidebar,
+)
 from ui.views import (
     render_alcohol_enforcement_view,
     render_responder_view,
@@ -18,6 +23,7 @@ st.set_page_config(
 load_styles()
 render_app_header()
 render_sidebar()
+render_exploration_guide()
 
 safety, responders, breathalyzers, vehicles = st.tabs(
     [

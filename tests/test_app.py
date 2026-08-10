@@ -23,6 +23,25 @@ class LayoutPrototypeTest(unittest.TestCase):
         )
         self.assertTrue(all(widget.disabled for widget in app.date_input))
         self.assertTrue(all(widget.disabled for widget in app.selectbox))
+        self.assertEqual([button.label for button in app.button], ["Clear selection"])
+        self.assertTrue(all(button.disabled for button in app.button))
+
+        rendered_text = "\n".join(markdown.value for markdown in app.markdown)
+        for expected_text in (
+            "Interface prototype - data not connected",
+            "Overview first",
+            "Zoom and filter",
+            "Details on demand",
+            "Crash hotspot map",
+            "Crash timing",
+            "Crash demand and responder locations",
+            "Alcohol-related crash concentration",
+            "Injury distribution by vehicle age",
+            "Planned interaction:",
+            "No visualization is rendered",
+        ):
+            with self.subTest(expected_text=expected_text):
+                self.assertIn(expected_text, rendered_text)
 
 
 if __name__ == "__main__":

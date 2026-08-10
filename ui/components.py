@@ -24,7 +24,9 @@ def render_app_header() -> None:
                     and vehicle-related injury severity.
                 </p>
             </div>
-            <span class="mce-status">Layout prototype</span>
+            <span class="mce-status" role="status">
+                Interface prototype - data not connected
+            </span>
         </header>
         """,
         unsafe_allow_html=True,
@@ -46,7 +48,26 @@ def render_sidebar() -> None:
             key="filter_area",
         )
         st.divider()
+        st.markdown("**Current selection**")
+        st.caption("No active selection - processed data is not connected.")
+        st.button("Clear selection", disabled=True, use_container_width=True)
         st.caption("Future selections will update every visualization in the active view.")
+
+
+def render_exploration_guide() -> None:
+    st.markdown(
+        """
+        <section class="mce-exploration-guide" aria-label="How to explore the dashboard">
+            <p class="mce-guide-title">How to explore</p>
+            <ol>
+                <li><strong>1. Overview first</strong><span>Start with the countywide map.</span></li>
+                <li><strong>2. Zoom and filter</strong><span>Narrow by time, place, or a chart selection.</span></li>
+                <li><strong>3. Details on demand</strong><span>Inspect exact values in tooltips and details.</span></li>
+            </ol>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_view_header(title: str, description: str, control_label: str, key: str) -> None:
@@ -89,10 +110,12 @@ def render_placeholder_card(
             <p>{escape(description)}</p>
             <div class="mce-empty-state" role="status">
                 <span class="mce-empty-icon" aria-hidden="true"></span>
-                <strong>Awaiting processed data</strong>
-                <small>Visualization will be added here</small>
+                <strong>No visualization is rendered</strong>
+                <small>Connect validated processed data to activate this planned view.</small>
             </div>
-            <p class="mce-interaction-note">{escape(interaction_note)}</p>
+            <p class="mce-interaction-note">
+                <strong>Planned interaction:</strong> {escape(interaction_note)}
+            </p>
         </section>
         """,
         unsafe_allow_html=True,

@@ -145,7 +145,7 @@ class LayoutPrototypeTest(unittest.TestCase):
         )
         self.assertCountEqual(
             [button.label for button in app.button],
-            ["Clear selection", "Clear map selection"],
+            ["Clear selection", "Clear map selection", "Clear alcohol selection"],
         )
         self.assertTrue(all(button.disabled for button in app.button))
 
@@ -163,7 +163,7 @@ class LayoutPrototypeTest(unittest.TestCase):
 
         rendered_text = "\n".join(markdown.value for markdown in app.markdown)
         for expected_text in (
-            "Fire &amp; Rescue analysis connected",
+            "Fire &amp; Rescue and alcohol analyses connected",
             "Overview first",
             "Zoom and filter",
             "Details on demand",
@@ -175,7 +175,7 @@ class LayoutPrototypeTest(unittest.TestCase):
             "Mapped fire station (rescue cross)",
             "Scatterplot legend",
             "Visible-cell medians",
-            "Alcohol-related crash concentration",
+            "Alcohol-related crashes by grid cell",
             "Injury distribution by vehicle age",
             "Planned interaction:",
             "No visualization is rendered",

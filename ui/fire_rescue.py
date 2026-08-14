@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import pydeck as pdk
 import streamlit as st
+from . import colors
 
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data" / "processed" / "fire-and-rescue"
@@ -266,10 +267,7 @@ def build_map(
         (demand["crash_count"] - demand["crash_count"].min())
         / max(demand["crash_count"].max() - demand["crash_count"].min(), 1)
     )
-    demand["fill_color"] = [
-        [255, int(235 - 185 * value), int(170 - 150 * value), 205]
-        for value in color_position
-    ]
+    demand["fill_color"] = colors.map_fill_colors(color_position)
     demand["title"] = "Grid cell " + demand["cell_id"]
     demand["line_1"] = demand["crash_count"].map(
         lambda count: f"Filtered crashes: {count}"
@@ -301,8 +299,8 @@ def build_map(
                 id="station-radius",
                 get_position=["station_longitude", "station_latitude"],
                 get_radius=radius_km * 1000,
-                get_fill_color=[8, 127, 120, 28],
-                get_line_color=[8, 127, 120, 210],
+                get_fill_color=colors.with_alpha(colors.STATION_RGB, 28),
+                get_line_color=colors.with_alpha(colors.STATION_RGB, 210),
                 line_width_min_pixels=2,
                 stroked=True,
                 pickable=False,
@@ -316,7 +314,7 @@ def build_map(
             get_position=["center_longitude", "center_latitude"],
             get_radius=260,
             get_fill_color="fill_color",
-            get_line_color=[255, 255, 255, 210],
+            get_line_color=colors.MAP_LINE_COLOR,
             radius_min_pixels=5,
             radius_max_pixels=24,
             line_width_min_pixels=1,
@@ -333,8 +331,8 @@ def build_map(
                 id="station-radius-incidents",
                 get_position=["longitude", "latitude"],
                 get_radius=55,
-                get_fill_color=[8, 127, 120, 210],
-                get_line_color=[255, 255, 255, 230],
+                get_fill_color=colors.with_alpha(colors.STATION_RGB, 210),
+                get_line_color=colors.with_alpha(colors.WHITE_RGB, 230),
                 radius_min_pixels=3,
                 radius_max_pixels=7,
                 line_width_min_pixels=1,
@@ -350,7 +348,7 @@ def build_map(
             get_position=["station_longitude", "station_latitude"],
             get_text="map_symbol",
             get_size=32,
-            get_color=[8, 127, 120, 255],
+            get_color=colors.with_alpha(colors.STATION_RGB, 255),
             get_text_anchor="'middle'",
             get_alignment_baseline="'center'",
             font_weight=900,
@@ -367,8 +365,8 @@ def build_map(
                 id="selected-cell",
                 get_position=["center_longitude", "center_latitude"],
                 get_radius=520,
-                get_fill_color=[20, 32, 43, 35],
-                get_line_color=[20, 32, 43, 255],
+                get_fill_color=colors.with_alpha(colors.SELECTED_RGB, 35),
+                get_line_color=colors.with_alpha(colors.SELECTED_RGB, 255),
                 line_width_min_pixels=3,
                 stroked=True,
                 pickable=False,
@@ -383,7 +381,7 @@ def build_map(
                 get_position=["station_longitude", "station_latitude"],
                 get_text="map_symbol",
                 get_size=44,
-                get_color=[20, 32, 43, 255],
+                get_color=colors.with_alpha(colors.SELECTED_RGB, 255),
                 get_text_anchor="'middle'",
                 get_alignment_baseline="'center'",
                 font_weight=900,
@@ -421,6 +419,7 @@ def build_gap_scatter(cells: pd.DataFrame, selected_cell: str | None) -> alt.Cha
     point_selection = alt.selection_point(
         name="cell_pick", fields=["cell_id"], toggle=False, clear="dblclick", empty=False
     )
+    zoom_selection = alt.selection_interval(name="cell_zoom", bind="scales")
     selected_expression = (
         point_selection | (alt.datum.cell_id == selected_cell)
         if selected_cell
@@ -461,7 +460,7 @@ def build_gap_scatter(cells: pd.DataFrame, selected_cell: str | None) -> alt.Cha
                 alt.Tooltip("common_roads:N", title="Common roads"),
             ],
         )
-        .add_params(point_selection)
+        .add_params(point_selection, zoom_selection)
     )
     medians = pd.DataFrame(
         {

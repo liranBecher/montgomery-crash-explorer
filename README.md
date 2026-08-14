@@ -21,13 +21,13 @@ and injury characteristics.
 
 | Implemented | Not implemented yet |
 | --- | --- |
-| Public Streamlit interface and Fire & Rescue Proximity analysis | Data-backed views for the other three tabs |
+| Public Streamlit interface, Fire & Rescue, and Police Breathalyzers analyses | Data-backed views for the other two tabs |
 | Four question-based tabs and responsive card layout | Data-backed charts for the other three tabs |
-| Fire & Rescue filters and linked map/scatter selection | Shared cross-tab filters and selections |
+| Fire & Rescue and alcohol filters with linked chart selections | Shared cross-tab filters and selections |
 | Planned interaction descriptions and automated layout test | Validated methods, findings, and recommendations |
 
-The Fire & Rescue tab is connected to processed data. The other three tabs
-remain interface prototypes and do not yet display findings.
+The Fire & Rescue and Police Breathalyzers tabs are connected to processed
+data. The other two tabs remain interface prototypes.
 
 ## Run locally
 
@@ -40,9 +40,9 @@ python -m pip install -r requirements.txt
 streamlit run app.py
 ```
 
-The committed Fire & Rescue Parquet files are required by the connected tab.
-Its preprocessing script can regenerate them when the ignored raw CSVs are
-available locally.
+The committed Fire & Rescue and Police Breathalyzers Parquet files are required
+by the connected tabs. Their preprocessing scripts can regenerate them when the
+ignored raw CSVs are available locally.
 
 Run the current automated test with:
 
@@ -67,11 +67,14 @@ app.py                    # Streamlit entry point
 ui/components.py          # Shared header, filters, guide, and placeholder cards
 ui/views.py               # View routing and remaining placeholders
 ui/fire_rescue.py         # Connected Fire & Rescue charts and interactions
+ui/police_breathalyzers.py # Connected alcohol map, timing, and interactions
 ui/styles.css             # Presentation and responsive styling
 tests/                    # Application and preprocessing contracts
 data/raw/                 # Original local downloads; not modified by the app
 preprocess/fire-and-rescue/ # Fire & Rescue preprocessing pipeline
 data/processed/fire-and-rescue/ # Fire & Rescue deployment-ready Parquet outputs
+preprocess/police-breathalyzers/ # Alcohol preprocessing pipeline
+data/processed/police-breathalyzers/ # Alcohol deployment-ready Parquet outputs
 output/report/            # Editable report artifact
 ```
 
@@ -83,7 +86,7 @@ output/report/            # Editable report artifact
 | --- | --- |
 | Python 3.12 | Application code and tests |
 | Streamlit 1.60.0 | Browser UI, tabs, disabled controls, and deployment |
-| pandas / PyArrow | Fire & Rescue transformation and Parquet storage |
+| pandas / PyArrow | Fire & Rescue and alcohol transformation and Parquet storage |
 | Altair | Interactive demand-distance scatterplot |
 | PyDeck | Linked crash-demand and station-location map |
 | HTML and CSS | Accessible structure, presentation, and responsive layout |
@@ -103,9 +106,8 @@ layer. No separate JavaScript frontend or database is planned.
 
 ## Data storage
 
-Raw downloads live in ignored `data/raw/`. The Fire & Rescue pipeline lives in
-`preprocess/fire-and-rescue/`; its committed deployment outputs live in
-`data/processed/fire-and-rescue/`.
+Raw downloads live in ignored `data/raw/`. Connected-view pipelines live under
+`preprocess/`; their committed deployment outputs live under `data/processed/`.
 
 Raw source files stay in `data/raw/` so processing remains reproducible without
 committing large originals. Compact processed files are committed with the app;
@@ -129,10 +131,11 @@ Python 3.12 and keep the app public for course submission.
 
 ## Current limitations
 
-- The safety, alcohol-enforcement, and vehicle views remain interface placeholders.
+- The safety and vehicle views remain interface placeholders.
 - Fire-station proximity is straight-line distance, not travel time or measured
   emergency response performance.
-- Planned alcohol-related and vehicle-age measures still require definitions
-  and validation.
+- The alcohol view describes historical recorded patterns; it does not measure
+  blood alcohol level or establish where enforcement should occur.
+- Planned vehicle-age measures still require definitions and validation.
 - Accessibility, browser compatibility, performance, and user comprehension
   have not yet been evaluated with live visualizations.

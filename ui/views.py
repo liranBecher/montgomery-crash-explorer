@@ -2,6 +2,7 @@ import streamlit as st
 
 from ui.components import render_placeholder_card, render_view_header
 from ui.fire_rescue import render_fire_rescue_view
+from ui.police_breathalyzers import render_police_breathalyzers_view
 
 
 def render_safety_view() -> None:
@@ -39,27 +40,7 @@ def render_responder_view() -> None:
 
 
 def render_alcohol_enforcement_view() -> None:
-    render_view_header(
-        "Where and when should police breathalyzer enforcement be prioritized?",
-        "Police breathalyzers detect alcohol levels; this view will examine alcohol-related crash patterns.",
-        "Alcohol-related measure",
-        "alcohol_enforcement_measure",
-    )
-    map_column, detail_column = st.columns([1.2, 1], gap="medium")
-    with map_column:
-        render_placeholder_card(
-            "Alcohol-related crash concentration",
-            "A geographic view of alcohol-related crash volume and share.",
-            height=430,
-            interaction_note="Selecting an area will update the enforcement-time view.",
-        )
-    with detail_column:
-        render_placeholder_card(
-            "Breathalyzer enforcement windows",
-            "A day-of-week and time-of-day view of alcohol-related crash activity.",
-            height=430,
-            interaction_note="Priority windows will appear only after the analysis is implemented.",
-        )
+    render_police_breathalyzers_view()
 
 
 def render_vehicle_view() -> None:

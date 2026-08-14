@@ -236,6 +236,15 @@
     background: linear-gradient(90deg, rgb(255, 235, 170), rgb(255, 50, 20));
 }
 
+.mce-legend-alcohol-gradient {
+    width: 2.5rem;
+    height: 0.65rem;
+    flex: 0 0 auto;
+    border: 1px solid #8b6aa8;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgb(225, 215, 238), rgb(107, 44, 145));
+}
+
 .mce-legend-line {
     width: 1.6rem;
     flex: 0 0 auto;

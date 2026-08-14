@@ -25,7 +25,7 @@ def render_app_header() -> None:
                 </p>
             </div>
             <span class="mce-status" role="status">
-                Fire &amp; Rescue analysis connected
+                Fire &amp; Rescue and alcohol analyses connected
             </span>
         </header>
         """,

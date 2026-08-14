@@ -25,7 +25,7 @@ def render_app_header() -> None:
                 </p>
             </div>
             <span class="mce-status" role="status">
-                Interface prototype - data not connected
+                Fire &amp; Rescue analysis connected
             </span>
         </header>
         """,
@@ -36,7 +36,7 @@ def render_app_header() -> None:
 def render_sidebar() -> None:
     with st.sidebar:
         st.header("Shared filters")
-        st.caption("Controls will activate when the processed-data contract is ready.")
+        st.caption("Shared controls will activate as the remaining views are connected. Fire & Rescue has local controls.")
         st.date_input("From", value=None, disabled=True, key="filter_start_date")
         st.date_input("To", value=None, disabled=True, key="filter_end_date")
         st.selectbox(
@@ -49,25 +49,9 @@ def render_sidebar() -> None:
         )
         st.divider()
         st.markdown("**Current selection**")
-        st.caption("No active selection - processed data is not connected.")
+        st.caption("No shared selection. Connected views show their local selection details.")
         st.button("Clear selection", disabled=True, use_container_width=True)
-        st.caption("Future selections will update every visualization in the active view.")
-
-
-def render_exploration_guide() -> None:
-    st.markdown(
-        """
-        <section class="mce-exploration-guide" aria-label="How to explore the dashboard">
-            <p class="mce-guide-title">How to explore</p>
-            <ol>
-                <li><strong>1. Overview first</strong><span>Start with the countywide map.</span></li>
-                <li><strong>2. Zoom and filter</strong><span>Narrow by time, place, or a chart selection.</span></li>
-                <li><strong>3. Details on demand</strong><span>Inspect exact values in tooltips and details.</span></li>
-            </ol>
-        </section>
-        """,
-        unsafe_allow_html=True,
-    )
+        st.caption("Shared selections will activate as the remaining views are connected.")
 
 
 def render_view_header(title: str, description: str, control_label: str, key: str) -> None:

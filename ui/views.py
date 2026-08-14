@@ -1,6 +1,7 @@
 import streamlit as st
 
 from ui.components import render_placeholder_card, render_view_header
+from ui.fire_rescue import render_fire_rescue_view
 
 
 def render_safety_view() -> None:
@@ -34,27 +35,7 @@ def render_safety_view() -> None:
 
 
 def render_responder_view() -> None:
-    render_view_header(
-        "Where are historical crash-response coverage gaps?",
-        "Compare severe-crash demand with existing first-responder locations.",
-        "Time of day",
-        "responder_daypart",
-    )
-    map_column, detail_column = st.columns([1.65, 0.8], gap="medium")
-    with map_column:
-        render_placeholder_card(
-            "Crash demand and responder locations",
-            "A map combining severe-crash concentration with existing response locations.",
-            height=430,
-            interaction_note="Map selections will update the coverage-gap summary.",
-        )
-    with detail_column:
-        render_placeholder_card(
-            "Candidate coverage gaps",
-            "Areas where historical crash demand may be farther from existing responders.",
-            height=430,
-            interaction_note="Candidates will appear only after the coverage method is finalized.",
-        )
+    render_fire_rescue_view()
 
 
 def render_alcohol_enforcement_view() -> None:

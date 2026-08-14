@@ -21,13 +21,13 @@ and injury characteristics.
 
 | Implemented | Not implemented yet |
 | --- | --- |
-| Public Streamlit interface prototype | Preprocessing pipeline and processed outputs |
-| Four question-based tabs and responsive card layout | Data-backed charts, maps, axes, legends, and tooltips |
-| Disabled shared and per-view controls with explicit empty states | Active filters, brushing, linking, and selection state |
+| Public Streamlit interface and Fire & Rescue Proximity analysis | Data-backed views for the other three tabs |
+| Four question-based tabs and responsive card layout | Data-backed charts for the other three tabs |
+| Fire & Rescue filters and linked map/scatter selection | Shared cross-tab filters and selections |
 | Planned interaction descriptions and automated layout test | Validated methods, findings, and recommendations |
 
-The live site is an interface prototype, not a completed analytical system. It
-does not currently display data or findings.
+The Fire & Rescue tab is connected to processed data. The other three tabs
+remain interface prototypes and do not yet display findings.
 
 ## Run locally
 
@@ -40,8 +40,9 @@ python -m pip install -r requirements.txt
 streamlit run app.py
 ```
 
-The prototype runs without processed data. All analytical controls remain
-disabled until the processed-data contract is finalized.
+The committed Fire & Rescue Parquet files are required by the connected tab.
+Its preprocessing script can regenerate them when the ignored raw CSVs are
+available locally.
 
 Run the current automated test with:
 
@@ -52,7 +53,7 @@ python -m unittest discover -s tests -v
 ## Planned views
 
 1. Safety hotspots by time, place, weather, road type, and light conditions
-2. Crash-response coverage around existing first-responder locations
+2. Serious/fatal crash proximity to mapped fire-station locations
 3. Priority locations and times for police breathalyzer alcohol-level enforcement
 4. Vehicle make/age and driver injury severity
 
@@ -64,11 +65,13 @@ Detailed encodings and linking behavior are specified in
 ```text
 app.py                    # Streamlit entry point
 ui/components.py          # Shared header, filters, guide, and placeholder cards
-ui/views.py               # Four question-based view layouts
+ui/views.py               # View routing and remaining placeholders
+ui/fire_rescue.py         # Connected Fire & Rescue charts and interactions
 ui/styles.css             # Presentation and responsive styling
-tests/test_app.py         # Data-free Streamlit layout contract
+tests/                    # Application and preprocessing contracts
 data/raw/                 # Original local downloads; not modified by the app
-data/processed/           # Future deployment-ready outputs
+preprocess/fire-and-rescue/ # Fire & Rescue preprocessing pipeline
+data/processed/fire-and-rescue/ # Fire & Rescue deployment-ready Parquet outputs
 output/report/            # Editable report artifact
 ```
 
@@ -80,6 +83,9 @@ output/report/            # Editable report artifact
 | --- | --- |
 | Python 3.12 | Application code and tests |
 | Streamlit 1.60.0 | Browser UI, tabs, disabled controls, and deployment |
+| pandas / PyArrow | Fire & Rescue transformation and Parquet storage |
+| Altair | Interactive demand-distance scatterplot |
+| PyDeck | Linked crash-demand and station-location map |
 | HTML and CSS | Accessible structure, presentation, and responsive layout |
 | GitHub | Source control and the public repository used by Streamlit Community Cloud |
 
@@ -87,10 +93,7 @@ output/report/            # Editable report artifact
 
 | Library | Intended use |
 | --- | --- |
-| pandas | Load, clean, join, reshape, and aggregate crash data |
-| PyArrow | Store processed tables as compact Parquet files |
 | Plotly Express / Graph Objects | Interactive timelines, distributions, comparisons, and linked chart selections |
-| PyDeck | Crash-point, hotspot, station, and response-coverage map layers |
 
 GeoPandas and Shapely are possible later additions for validated spatial work;
 they are not current project dependencies.
@@ -100,17 +103,14 @@ layer. No separate JavaScript frontend or database is planned.
 
 ## Data storage
 
-```text
-data/
-|-- raw/        # Original downloads; local only and ignored by Git
-`-- processed/  # Future deployment-ready Parquet or GeoJSON files
-```
+Raw downloads live in ignored `data/raw/`. The Fire & Rescue pipeline lives in
+`preprocess/fire-and-rescue/`; its committed deployment outputs live in
+`data/processed/fire-and-rescue/`.
 
 Raw source files stay in `data/raw/` so processing remains reproducible without
-committing large originals. The future deployed app will read compact processed
-files from `data/processed/`. Files small enough for normal GitHub limits can be
-committed with the app; larger data should be fetched from the source API and
-cached with `st.cache_data` rather than introducing a database.
+committing large originals. Compact processed files are committed with the app;
+larger future data should be fetched from the source API and cached with
+`st.cache_data` rather than introducing a database.
 
 Only add another library to `requirements.txt` when implemented work requires
 it.
@@ -129,11 +129,10 @@ Python 3.12 and keep the app public for course submission.
 
 ## Current limitations
 
-- No preprocessing method, join logic, missing-value policy, derived fields, or
-  processed row counts have been implemented.
-- The app contains no data marks or analytical results; controls and selection
-  actions are intentionally disabled.
-- Planned responder-coverage, alcohol-related, vehicle-age, and injury measures
-  still require definitions and validation.
+- The safety, alcohol-enforcement, and vehicle views remain interface placeholders.
+- Fire-station proximity is straight-line distance, not travel time or measured
+  emergency response performance.
+- Planned alcohol-related and vehicle-age measures still require definitions
+  and validation.
 - Accessibility, browser compatibility, performance, and user comprehension
   have not yet been evaluated with live visualizations.

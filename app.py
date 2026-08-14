@@ -3,7 +3,6 @@ import streamlit as st
 from ui.components import (
     load_styles,
     render_app_header,
-    render_exploration_guide,
     render_sidebar,
 )
 from ui.views import (
@@ -23,12 +22,11 @@ st.set_page_config(
 load_styles()
 render_app_header()
 render_sidebar()
-render_exploration_guide()
 
 safety, responders, breathalyzers, vehicles = st.tabs(
     [
         "Safety Hotspots",
-        "First Responders",
+        "Fire & Rescue Proximity",
         "Police Breathalyzers",
         "Vehicles & Injuries",
     ]

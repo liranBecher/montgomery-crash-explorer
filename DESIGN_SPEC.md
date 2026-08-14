@@ -69,14 +69,25 @@ selection will restore the countywide overview.
   vertical axis; crash count or share to sequential color.
 - Details on demand: day, hour, count, share, active geography, and date range.
 
-### 2. First Responders
+### 2. Fire & Rescue Proximity
 
-- Main map: severe-crash demand and verified first-responder locations as
-  separate, clearly labeled layers.
-- Detail view: candidate historical coverage gaps with the demand, distance or
-  travel measure, and sample size used in the final method.
-- The coverage definition, distance/travel method, thresholds, and ranking rule
-  remain undecided until coordinate and station data are validated.
+- Main map: filtered crash demand and mapped fire stations as separate,
+  clearly labeled layers. Fatal, suspected-serious, and possible injury are
+  available; suspected-serious and fatal are selected by default. Minor and
+  no-apparent-injury records remain in processed data but are not UI options.
+- Linked detail view: occupied grid cells plotted by crash count and Haversine
+  distance from cell center to the nearest mapped station. Grid-cell circles
+  use a uniform size so position remains the only quantitative encoding.
+- Station comparison: a ranked horizontal bar chart counts filtered crashes
+  inside an adjustable straight-line radius around each
+  mapped station, with controls for the most-active or least-active end of the
+  ranking. Overlapping radii may count a crash for multiple stations.
+- Map selection details appear in a compact bottom-left overlay rather than
+  moving later charts. Clicking a station bar focuses the map; hovering only
+  shows the chart tooltip and does not rerun the page. Empty-map clicks clear
+  selection.
+- The view describes straight-line proximity only. It does not represent road
+  travel time, dispatch history, service areas, staffing, or response performance.
 
 ### 3. Police Breathalyzers
 

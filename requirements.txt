@@ -1,5 +1,7 @@
 streamlit==1.60.0
 pandas
+numpy
 pyarrow
+altair
 plotly
 pydeck

@@ -21,16 +21,17 @@ class PoliceBreathalyzersUiTest(unittest.TestCase):
     def setUp(self) -> None:
         self.crashes = pd.DataFrame(
             {
-                "report_number": ["A", "B", "C"],
-                "cell_id": ["one", "one", "two"],
-                "weekday": ["Monday", "Monday", "Tuesday"],
-                "hour": [1, 1, 2],
+                "report_number": ["A", "B", "C", "D"],
+                "cell_id": ["one", "one", "two", "three"],
+                "weekday": ["Monday", "Monday", "Tuesday", "Wednesday"],
+                "hour": [1, 1, 2, 3],
                 "alcohol_status": [
                     "Alcohol present/contributed",
                     "No alcohol indication",
                     "Suspected alcohol use",
+                    "No alcohol indication",
                 ],
-                "road_name": ["A ROAD", "A ROAD", "B ROAD"],
+                "road_name": ["A ROAD", "A ROAD", "B ROAD", "C ROAD"],
             }
         )
         self.alcohol = self.crashes[
@@ -40,9 +41,9 @@ class PoliceBreathalyzersUiTest(unittest.TestCase):
         ]
         self.cells = pd.DataFrame(
             {
-                "cell_id": ["one", "two"],
-                "center_latitude": [39.0, 39.1],
-                "center_longitude": [-77.0, -77.1],
+                "cell_id": ["one", "two", "three"],
+                "center_latitude": [39.0, 39.1, 39.2],
+                "center_longitude": [-77.0, -77.1, -77.2],
             }
         )
 
@@ -51,6 +52,7 @@ class PoliceBreathalyzersUiTest(unittest.TestCase):
         self.assertEqual(mapped.loc["one", "alcohol_count"], 1)
         self.assertEqual(mapped.loc["one", "total_crashes"], 2)
         self.assertEqual(mapped.loc["one", "alcohol_share_pct"], 50.0)
+        self.assertNotIn("three", mapped.index)
 
         timing = aggregate_timing(self.crashes, self.alcohol)
         self.assertEqual(len(timing), 7 * 24)

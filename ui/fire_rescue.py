@@ -661,9 +661,7 @@ def render_fire_rescue_view() -> None:
         )
 
     stored_date_range = st.session_state.get(date_range_key)
-    if not isinstance(stored_date_range, (tuple, list)) or len(stored_date_range) != 2:
-        st.session_state[date_range_key] = (default_start_date, maximum_date)
-    else:
+    if isinstance(stored_date_range, (tuple, list)) and len(stored_date_range) == 2:
         stored_start_date, stored_end_date = stored_date_range
         st.session_state[date_range_key] = _bound_date_range(
             stored_start_date,

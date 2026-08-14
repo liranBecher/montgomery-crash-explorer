@@ -70,7 +70,7 @@ def aggregate_cells(
     return (
         cells[["cell_id", "center_latitude", "center_longitude"]]
         .merge(totals, on="cell_id", how="inner", validate="one_to_one")
-        .merge(alcohol, on="cell_id", how="left", validate="one_to_one")
+        .merge(alcohol, on="cell_id", how="inner", validate="one_to_one")
         .merge(status_counts, on="cell_id", how="left", validate="one_to_one")
         .merge(roads, on="cell_id", how="left", validate="one_to_one")
         .fillna(

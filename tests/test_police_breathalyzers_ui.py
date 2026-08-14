@@ -10,6 +10,7 @@ from ui.police_breathalyzers import (
     aggregate_timing,
     build_heatmap,
     build_map,
+    effective_minimum_sample,
 )
 
 
@@ -79,6 +80,8 @@ class PoliceBreathalyzersUiTest(unittest.TestCase):
             ),
             ("Monday", 1),
         )
+        self.assertEqual(effective_minimum_sample(5, "Monday"), 1)
+        self.assertEqual(effective_minimum_sample(5, None), 5)
 
 
 if __name__ == "__main__":

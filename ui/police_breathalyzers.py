@@ -27,6 +27,11 @@ MAP_MEASURES = {
 }
 
 
+def effective_minimum_sample(configured: int, selected_weekday: str | None) -> int:
+    """Show every occupied map cell while a single heatmap window is active."""
+    return 1 if selected_weekday is not None else configured
+
+
 @st.cache_data
 def load_police_breathalyzer_data() -> tuple[pd.DataFrame, pd.DataFrame]:
     """Load the committed crash and cell datasets."""
@@ -280,7 +285,8 @@ def render_police_breathalyzers_view() -> None:
         """
         <div class="mce-view-heading">
             <h2>Where and when are alcohol-related crashes recorded?</h2>
-            <p>Explore historical crash records with alcohol present, contributing, suspected, or included in a combined substance label. This view does not measure blood alcohol level or recommend enforcement.</p>
+            <h6>Police Breathalyzers possible placements</h6>
+            <p>Explore historical crash records with alcohol present, contributing, suspected, or included in a combined substance label.</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -290,7 +296,7 @@ def render_police_breathalyzers_view() -> None:
     maximum_date = crashes["crash_datetime"].max().date()
     date_key = f"alcohol_date_range_{maximum_date.isoformat()}"
     st.session_state.setdefault(
-        date_key, (min(minimum_date, maximum_date - timedelta(days=365 * 5)), maximum_date)
+        date_key, (max(minimum_date, maximum_date - timedelta(days=365 * 5)), maximum_date)
     )
 
     date_column, status_column, measure_column, sample_column = st.columns(
@@ -360,8 +366,9 @@ def render_police_breathalyzer_visuals(
         map_alcohol = map_alcohol[
             map_alcohol["weekday"].eq(selected_weekday) & map_alcohol["hour"].eq(selected_hour)
         ]
+    active_minimum_sample = effective_minimum_sample(minimum_sample, selected_weekday)
     mapped = aggregate_cells(map_all, map_alcohol, cells)
-    mapped = mapped[mapped["total_crashes"].ge(minimum_sample)].reset_index(drop=True)
+    mapped = mapped[mapped["total_crashes"].ge(active_minimum_sample)].reset_index(drop=True)
     if selected_cell and selected_cell not in set(mapped["cell_id"]):
         st.session_state["alcohol_selected_cell"] = None
         selected_cell = None
@@ -376,6 +383,7 @@ def render_police_breathalyzer_visuals(
         time_context = f" · {selected_weekday} {selected_hour:02d}:00" if selected_weekday else ""
         st.caption(
             f"{len(alcohol):,} selected alcohol-related crashes out of {len(dated):,} total · {geography}{time_context}"
+            + (" · map minimum automatically reduced to 1 crash per cell" if selected_weekday else "")
         )
     with clear:
         if st.button(

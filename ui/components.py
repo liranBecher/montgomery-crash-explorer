@@ -19,6 +19,7 @@ def render_app_header() -> None:
             <div>
                 <p class="mce-eyebrow">Montgomery County, Maryland</p>
                 <h1>Crash Explorer</h1>
+                <h5>An assistance system for exploring crash data in the Montgomery County area</h5>
                 <p class="mce-subtitle">
                     Explore crash patterns, response coverage, alcohol enforcement,
                     and vehicle-related injury severity.

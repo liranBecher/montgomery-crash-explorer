@@ -654,8 +654,11 @@ def render_fire_rescue_view() -> None:
     crashes, cells, stations = load_fire_rescue_data()
     minimum_date = crashes["crash_datetime"].min().date()
     maximum_date = crashes["crash_datetime"].max().date()
-    default_start_date = max(minimum_date, maximum_date - timedelta(days=90))
+    default_start_date = max(minimum_date, maximum_date - timedelta(days=365 * 5))
     date_range_key = f"fire_rescue_date_range_{maximum_date.isoformat()}"
+    st.session_state.setdefault(
+            date_range_key, (default_start_date, maximum_date)
+        )
 
     stored_date_range = st.session_state.get(date_range_key)
     if not isinstance(stored_date_range, (tuple, list)) or len(stored_date_range) != 2:

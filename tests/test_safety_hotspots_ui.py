@@ -1,0 +1,96 @@
+import unittest
+
+import pandas as pd
+
+from ui.safety_hotspots import (
+    _map_cell_from_event,
+    _time_from_event,
+    aggregate_cells,
+    aggregate_fingerprint,
+    aggregate_timing,
+    build_fingerprint,
+    build_heatmap,
+    build_map,
+)
+
+
+class SafetyHotspotsUiTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.crashes = pd.DataFrame(
+            {
+                "report_number": ["A", "B", "C", "D"],
+                "crash_datetime": pd.to_datetime(
+                    ["2026-01-05 01:00", "2026-01-05 01:30", "2026-01-06 02:00", "2026-01-07 03:00"]
+                ),
+                "cell_id": ["39.00:-77.10", "39.00:-77.10", "39.01:-77.11", "39.02:-77.12"],
+                "weekday": ["Monday", "Monday", "Tuesday", "Wednesday"],
+                "hour": [1, 1, 2, 3],
+                "serious_or_fatal": [False, True, False, False],
+                "road_name": ["A ROAD", "A ROAD", "B ROAD", pd.NA],
+                "route_group": ["County", "County", "State / US", "Not recorded"],
+                "weather_group": ["Clear", "Rain", "Clear", "Not recorded"],
+                "surface_group": ["Dry", "Wet", "Dry", "Not recorded"],
+                "light_group": ["Daylight", "Dark - lighted", "Daylight", "Not recorded"],
+            }
+        )
+
+    def test_aggregates_cells_conditions_and_complete_timing(self) -> None:
+        cells = aggregate_cells(self.crashes).set_index("cell_id")
+        self.assertEqual(cells.loc["39.00:-77.10", "crash_count"], 2)
+        self.assertEqual(cells.loc["39.00:-77.10", "serious_or_fatal_count"], 1)
+        self.assertAlmostEqual(cells.loc["39.00:-77.10", "center_latitude"], 39.005)
+
+        fingerprint = aggregate_fingerprint(self.crashes, "39.00:-77.10")
+        self.assertEqual(set(fingerprint["family"]), {"Weather", "Surface", "Light"})
+        not_recorded = fingerprint[
+            fingerprint["category"].eq("Not recorded")
+            & fingerprint["geography"].eq("County baseline")
+        ]
+        self.assertEqual(len(not_recorded), 3)
+        county_baseline = fingerprint[
+            fingerprint["family"].eq("Weather")
+            & fingerprint["category"].eq("Clear")
+            & fingerprint["geography"].eq("County baseline")
+        ].iloc[0]
+        self.assertEqual(county_baseline["share_pct"], 50)
+
+        baseline_only = aggregate_fingerprint(self.crashes)
+        self.assertEqual(set(baseline_only["family"]), {"Weather", "Surface", "Light"})
+        self.assertEqual(
+            baseline_only[baseline_only["family"].eq("Weather") & baseline_only["category"].eq("Clear")]["geography"].unique().tolist(),
+            ["County baseline"],
+        )
+
+        timing = aggregate_timing(self.crashes, "Countywide", "Jan 1–Jan 31")
+        self.assertEqual(len(timing), 7 * 24)
+        monday_one = timing[timing["weekday"].eq("Monday") & timing["hour"].eq(1)].iloc[0]
+        self.assertEqual(monday_one["crash_count"], 2)
+        self.assertEqual(monday_one["share_pct"], 50)
+
+    def test_builds_linked_views_and_parses_selections(self) -> None:
+        cells = aggregate_cells(self.crashes)
+        fingerprint = aggregate_fingerprint(self.crashes, "39.00:-77.10")
+        timing = aggregate_timing(self.crashes, "Countywide", "Jan 1–Jan 31")
+        deck = build_map(cells, "39.00:-77.10", "Jan 1–Jan 31")
+        heatmap = build_heatmap(timing, "Monday", 1).to_dict()
+        comparison = build_fingerprint(fingerprint).to_dict()
+
+        self.assertEqual([layer.id for layer in deck.layers], ["safety-cells", "selected-safety-cell"])
+        self.assertEqual(heatmap["params"][0]["name"], "safety_time_pick")
+        self.assertEqual(len(comparison["vconcat"]), 3)
+        self.assertEqual(
+            _map_cell_from_event(
+                {"selection": {"objects": {"safety-cells": [{"cell_id": "39.00:-77.10"}]}}}
+            ),
+            "39.00:-77.10",
+        )
+        self.assertEqual(
+            _time_from_event(
+                {"selection": {"safety_time_pick": [{"weekday": "Monday", "hour": 1}]}}
+            ),
+            ("Monday", 1),
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()

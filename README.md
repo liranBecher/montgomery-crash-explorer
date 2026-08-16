@@ -21,13 +21,13 @@ and injury characteristics.
 
 | Implemented | Not implemented yet |
 | --- | --- |
-| Public Streamlit interface, Fire & Rescue, and Police Breathalyzers analyses | Data-backed views for the other two tabs |
-| Four question-based tabs and responsive card layout | Data-backed charts for the other three tabs |
-| Fire & Rescue and alcohol filters with linked chart selections | Shared cross-tab filters and selections |
-| Planned interaction descriptions and automated layout test | Validated methods, findings, and recommendations |
+| Public Streamlit interface plus Safety Hotspots, Fire & Rescue, and Police Breathalyzers analyses | Data-backed Vehicles & Injuries tab |
+| Three connected analyses with responsive maps and charts | Shared cross-tab filters and selections |
+| Safety, Fire & Rescue, and alcohol filters with linked chart selections | Final validated findings and recommendations |
+| Automated preprocessing and interface contracts | — |
 
-The Fire & Rescue and Police Breathalyzers tabs are connected to processed
-data. The other two tabs remain interface prototypes.
+The Safety Hotspots, Fire & Rescue, and Police Breathalyzers tabs are connected
+to processed data. Vehicles & Injuries remains an interface prototype.
 
 ## Run locally
 
@@ -40,9 +40,9 @@ python -m pip install -r requirements.txt
 streamlit run app.py
 ```
 
-The committed Fire & Rescue and Police Breathalyzers Parquet files are required
-by the connected tabs. Their preprocessing scripts can regenerate them when the
-ignored raw CSVs are available locally.
+The committed Safety Hotspots, Fire & Rescue, and Police Breathalyzers Parquet
+files are required by the connected tabs. Their preprocessing scripts can
+regenerate them when the ignored raw CSVs are available locally.
 
 Run the current automated test with:
 
@@ -66,6 +66,7 @@ Detailed encodings and linking behavior are specified in
 app.py                    # Streamlit entry point
 ui/components.py          # Shared header, filters, guide, and placeholder cards
 ui/views.py               # View routing and remaining placeholders
+ui/safety_hotspots.py     # Connected hotspot map, fingerprint, and timing views
 ui/fire_rescue.py         # Connected Fire & Rescue charts and interactions
 ui/police_breathalyzers.py # Connected alcohol map, timing, and interactions
 ui/styles.css             # Presentation and responsive styling
@@ -73,6 +74,8 @@ tests/                    # Application and preprocessing contracts
 data/raw/                 # Original local downloads; not modified by the app
 preprocess/fire-and-rescue/ # Fire & Rescue preprocessing pipeline
 data/processed/fire-and-rescue/ # Fire & Rescue deployment-ready Parquet outputs
+preprocess/safety-hotspots/ # Safety Hotspots preprocessing pipeline
+data/processed/safety-hotspots/ # Safety Hotspots deployment-ready Parquet output
 preprocess/police-breathalyzers/ # Alcohol preprocessing pipeline
 data/processed/police-breathalyzers/ # Alcohol deployment-ready Parquet outputs
 output/report/            # Editable report artifact
@@ -86,9 +89,9 @@ output/report/            # Editable report artifact
 | --- | --- |
 | Python 3.12 | Application code and tests |
 | Streamlit 1.60.0 | Browser UI, tabs, disabled controls, and deployment |
-| pandas / PyArrow | Fire & Rescue and alcohol transformation and Parquet storage |
-| Altair | Interactive demand-distance scatterplot |
-| PyDeck | Linked crash-demand and station-location map |
+| pandas / PyArrow | Connected-view transformation and Parquet storage |
+| Altair | Interactive comparisons, scatterplots, and timing heatmaps |
+| PyDeck | Linked crash hotspot and station-location maps |
 | HTML and CSS | Accessible structure, presentation, and responsive layout |
 | GitHub | Source control and the public repository used by Streamlit Community Cloud |
 

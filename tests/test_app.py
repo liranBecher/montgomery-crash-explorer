@@ -95,7 +95,7 @@ class LayoutPrototypeTest(unittest.TestCase):
             }
         )
         deck = build_map(cells, stations, crashes, None, None, 1.5, False)
-        self.assertEqual(deck.layers[0].id, "map-background")
+        self.assertEqual(deck.layers[0].id, "crash-cells")
 
     def test_app_renders_connected_fire_rescue_view(self) -> None:
         app = AppTest.from_file(str(PROJECT_ROOT / "app.py")).run(timeout=15)
@@ -145,7 +145,12 @@ class LayoutPrototypeTest(unittest.TestCase):
         )
         self.assertCountEqual(
             [button.label for button in app.button],
-            ["Clear selection", "Clear map selection", "Clear alcohol selection"],
+            [
+                "Clear selection",
+                "Clear hotspot selection",
+                "Clear map selection",
+                "Clear alcohol selection",
+            ],
         )
         self.assertTrue(all(button.disabled for button in app.button))
 
@@ -161,13 +166,14 @@ class LayoutPrototypeTest(unittest.TestCase):
             any("Bottom 15 mapped stations" in caption.value for caption in app.caption)
         )
 
-        rendered_text = "\n".join(markdown.value for markdown in app.markdown)
+        rendered_text = "\n".join(
+            [markdown.value for markdown in app.markdown]
+            + [heading.value for heading in app.subheader]
+        )
         for expected_text in (
-            "Fire &amp; Rescue and alcohol analyses connected",
-            "Overview first",
-            "Zoom and filter",
-            "Details on demand",
-            "Crash hotspot map",
+            "Safety, Fire &amp; Rescue, and alcohol analyses connected",
+            "Crash hotspots by grid cell",
+            "Hotspot fingerprint",
             "Crash timing",
             "Where are crashes farther from mapped fire stations?",
             "Map legend",

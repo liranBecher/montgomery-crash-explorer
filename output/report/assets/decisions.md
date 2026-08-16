@@ -147,6 +147,8 @@ the Fire & Rescue Proximity and Police Breathalyzers tabs.
 - A single clear action resets both spatial and time selections, and the
   summary text always states whether the current context is countywide or a
   selected cell and time.
+- For the day-time heatmap, we wanted to show the difference between day and night,
+  therefore the time axis is 6:00-5:00
 
 ### Analytical cautions
 

@@ -9,6 +9,12 @@ import pandas as pd
 import pydeck as pdk
 import streamlit as st
 from . import colors
+from .map_layers import (
+    cell_view_state,
+    crash_point_layer,
+    grid_cell_layer,
+    selected_cell_layer,
+)
 
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data" / "processed" / "police-breathalyzers"
@@ -123,7 +129,7 @@ def _selection(event: object) -> object:
 def _map_cell_from_event(event: object) -> str | None:
     selection = _selection(event)
     objects = selection.get("objects", {}) if isinstance(selection, dict) else getattr(selection, "objects", {})
-    selected = objects.get("alcohol-cells", [])
+    selected = objects.get("alcohol-cells", []) or objects.get("alcohol-crashes", [])
     return str(selected[0]["cell_id"]) if selected else None
 
 
@@ -143,6 +149,7 @@ def _map_selection_callback(key: str) -> None:
     st.session_state["alcohol_selected_cell"] = _map_cell_from_event(
         st.session_state.get(key, {})
     )
+    st.session_state["alcohol_map_generation"] += 1
     st.session_state["alcohol_heatmap_generation"] += 1
 
 
@@ -156,6 +163,7 @@ def _time_selection_callback(key: str) -> None:
 
 def build_map(
     cells: pd.DataFrame,
+    crashes: pd.DataFrame,
     measure: str,
     selected_cell: str | None,
 ) -> pdk.Deck:
@@ -173,44 +181,23 @@ def build_map(
         lambda row: f"Share: {row['alcohol_share_pct']:.1f}% of {row['total_crashes']:,} crashes",
         axis=1,
     )
-    layers = [
-        pdk.Layer(
-            "ScatterplotLayer",
-            plotted,
-            id="alcohol-cells",
-            get_position=["center_longitude", "center_latitude"],
-            get_radius=260,
-            get_fill_color="fill_color",
-            get_line_color=colors.MAP_LINE_COLOR,
-            radius_min_pixels=5,
-            radius_max_pixels=24,
-            line_width_min_pixels=1,
-            stroked=True,
-            pickable=True,
-            auto_highlight=True,
-        )
-    ]
-    if selected_cell and selected_cell in set(cells["cell_id"]):
-        layers.append(
-            pdk.Layer(
-                "ScatterplotLayer",
-                cells[cells["cell_id"].eq(selected_cell)],
-                id="selected-alcohol-cell",
-                get_position=["center_longitude", "center_latitude"],
-                get_radius=520,
-                get_fill_color=colors.with_alpha(colors.SELECTED_RGB, 25),
-                get_line_color=colors.with_alpha(colors.SELECTED_RGB, 255),
-                line_width_min_pixels=3,
-                stroked=True,
-                pickable=False,
-            )
-        )
+    plotted["line_3"] = plotted["status_breakdown"]
+    plotted["line_4"] = "Roads: " + plotted["common_roads"].astype(str)
+    layers = [grid_cell_layer(plotted, "alcohol-cells")]
+    ring = selected_cell_layer(cells, selected_cell, "selected-alcohol-cell")
+    incidents = crash_point_layer(
+        crashes,
+        selected_cell,
+        "alcohol-crashes",
+        (("alcohol_status", "Alcohol status"), ("municipality", "Municipality")),
+    )
+    layers.extend(layer for layer in (ring, incidents) if layer is not None)
     return pdk.Deck(
         layers=layers,
-        initial_view_state=pdk.ViewState(latitude=39.12, longitude=-77.13, zoom=8.6),
+        initial_view_state=cell_view_state(cells, selected_cell),
         map_provider="carto",
         map_style=pdk.map_styles.CARTO_LIGHT,
-        tooltip={"html": "<b>{title}</b><br>{line_1}<br>{line_2}<br>{status_breakdown}<br>Roads: {common_roads}"},
+        tooltip={"html": "<b>{title}</b><br>{line_1}<br>{line_2}<br>{line_3}<br>{line_4}"},
         description=f"Map colored by {value_label.lower()}",
     )
 
@@ -408,7 +395,7 @@ def render_police_breathalyzer_visuals(
             render_legend(mapped, measure)
             map_key = f"alcohol_map_{map_generation}"
             st.pydeck_chart(
-                build_map(mapped, measure, selected_cell),
+                build_map(mapped, map_alcohol, measure, selected_cell),
                 key=map_key,
                 on_select=lambda: _map_selection_callback(map_key),
                 selection_mode="single-object",

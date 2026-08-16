@@ -10,6 +10,12 @@ import pydeck as pdk
 import streamlit as st
 
 from . import colors
+from .map_layers import (
+    cell_view_state,
+    crash_point_layer,
+    grid_cell_layer,
+    selected_cell_layer,
+)
 
 
 CRASHES_FILE = (
@@ -174,7 +180,7 @@ def _selection(event: object) -> object:
 def _map_cell_from_event(event: object) -> str | None:
     selection = _selection(event)
     objects = selection.get("objects", {}) if isinstance(selection, dict) else getattr(selection, "objects", {})
-    selected = objects.get("safety-cells", [])
+    selected = objects.get("safety-cells", []) or objects.get("safety-crashes", [])
     return str(selected[0]["cell_id"]) if selected else None
 
 
@@ -191,6 +197,7 @@ def _time_from_event(event: object) -> tuple[str | None, int | None]:
 
 def _map_selection_callback(key: str) -> None:
     st.session_state["safety_selected_cell"] = _map_cell_from_event(st.session_state.get(key, {}))
+    st.session_state["safety_map_generation"] += 1
     st.session_state["safety_heatmap_generation"] += 1
 
 
@@ -201,7 +208,12 @@ def _time_selection_callback(key: str) -> None:
     st.session_state["safety_map_generation"] += 1
 
 
-def build_map(cells: pd.DataFrame, selected_cell: str | None, date_range: str) -> pdk.Deck:
+def build_map(
+    cells: pd.DataFrame,
+    crashes: pd.DataFrame,
+    selected_cell: str | None,
+    date_range: str,
+) -> pdk.Deck:
     """Build the selectable hotspot map."""
     plotted = cells.copy()
     minimum, maximum = plotted["crash_count"].min(), plotted["crash_count"].max()
@@ -212,45 +224,24 @@ def build_map(cells: pd.DataFrame, selected_cell: str | None, date_range: str) -
     plotted["line_1"] = plotted["crash_count"].map(lambda value: f"Crashes: {value:,}")
     plotted["line_2"] = plotted["county_share_pct"].map(lambda value: f"County share: {value:.2f}%")
     plotted["line_3"] = plotted["serious_or_fatal_count"].map(lambda value: f"Serious/fatal: {value:,}")
-    layers = [
-        pdk.Layer(
-            "ScatterplotLayer",
-            plotted,
-            id="safety-cells",
-            get_position=["center_longitude", "center_latitude"],
-            get_radius=260,
-            get_fill_color="fill_color",
-            get_line_color=colors.MAP_LINE_COLOR,
-            radius_min_pixels=5,
-            radius_max_pixels=24,
-            line_width_min_pixels=1,
-            stroked=True,
-            pickable=True,
-            auto_highlight=True,
-        )
-    ]
-    if selected_cell and selected_cell in set(cells["cell_id"]):
-        layers.append(
-            pdk.Layer(
-                "ScatterplotLayer",
-                cells[cells["cell_id"].eq(selected_cell)],
-                id="selected-safety-cell",
-                get_position=["center_longitude", "center_latitude"],
-                get_radius=520,
-                get_fill_color=colors.with_alpha(colors.SELECTED_RGB, 25),
-                get_line_color=colors.with_alpha(colors.SELECTED_RGB, 255),
-                line_width_min_pixels=3,
-                stroked=True,
-                pickable=False,
-            )
-        )
+    plotted["line_4"] = date_range
+    plotted["line_5"] = "Roads: " + plotted["common_roads"].astype(str)
+    layers = [grid_cell_layer(plotted, "safety-cells")]
+    ring = selected_cell_layer(cells, selected_cell, "selected-safety-cell")
+    incidents = crash_point_layer(
+        crashes,
+        selected_cell,
+        "safety-crashes",
+        (("severity", "Severity"), ("weather_group", "Weather")),
+    )
+    layers.extend(layer for layer in (ring, incidents) if layer is not None)
     return pdk.Deck(
         layers=layers,
-        initial_view_state=pdk.ViewState(latitude=39.12, longitude=-77.13, zoom=8.6),
+        initial_view_state=cell_view_state(cells, selected_cell),
         map_provider="carto",
         map_style=pdk.map_styles.CARTO_LIGHT,
         tooltip={
-            "html": "<b>{title}</b><br>{line_1}<br>{line_2}<br>{line_3}<br>{date_range}<br>Roads: {common_roads}"
+            "html": "<b>{title}</b><br>{line_1}<br>{line_2}<br>{line_3}<br>{line_4}<br>{line_5}"
         },
         description="Map of classified crash concentrations by grid cell",
     )
@@ -414,7 +405,7 @@ def render_safety_hotspots_visuals(
             linked["weekday"].eq(selected_weekday) & linked["hour"].eq(selected_hour)
         ]
     mapped = aggregate_cells(linked)
-    if selected_cell and selected_cell not in set(filtered["cell_id"]):
+    if selected_cell and selected_cell not in set(mapped["cell_id"]):
         st.session_state["safety_selected_cell"] = None
         selected_cell = None
 
@@ -451,7 +442,7 @@ def render_safety_hotspots_visuals(
             _render_map_legend(mapped)
             map_key = f"safety_map_{map_generation}"
             st.pydeck_chart(
-                build_map(mapped, selected_cell, date_label),
+                build_map(mapped, linked, selected_cell, date_label),
                 key=map_key,
                 on_select=lambda: _map_selection_callback(map_key),
                 selection_mode="single-object",

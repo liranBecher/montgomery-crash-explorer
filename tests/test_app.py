@@ -1,12 +1,14 @@
 from pathlib import Path
 import unittest
 from datetime import date
+from unittest.mock import patch
 
 import pandas as pd
 from streamlit.testing.v1 import AppTest
 
 from ui.fire_rescue import (
     _bound_date_range,
+    _map_selection_callback,
     _map_selection_from_event,
     aggregate_station_radius,
     build_map,
@@ -38,6 +40,12 @@ class LayoutPrototypeTest(unittest.TestCase):
         )
         self.assertEqual(
             _map_selection_from_event(
+                {"selection": {"objects": {"cell-crashes": [{"cell_id": "cell"}]}}}
+            ),
+            ("cell", None),
+        )
+        self.assertEqual(
+            _map_selection_from_event(
                 {"selection": {"objects": {"fire-stations": [{"station_id": "7"}]}}}
             ),
             (None, "7"),
@@ -52,6 +60,21 @@ class LayoutPrototypeTest(unittest.TestCase):
             ),
             (None, None),
         )
+
+    def test_fire_map_selection_remounts_map_for_selected_viewport(self) -> None:
+        state = {
+            "map": {
+                "selection": {"objects": {"crash-cells": [{"cell_id": "cell"}]}}
+            },
+            "fire_rescue_map_generation": 5,
+            "fire_rescue_scatter_generation": 2,
+        }
+        with patch("ui.fire_rescue.st.session_state", state):
+            _map_selection_callback("map")
+
+        self.assertEqual(state["fire_rescue_selected_cell"], "cell")
+        self.assertEqual(state["fire_rescue_selected_station"], None)
+        self.assertEqual(state["fire_rescue_map_generation"], 6)
 
     def test_station_radius_counts_overlapping_proximity(self) -> None:
         crashes = pd.DataFrame(
@@ -96,6 +119,51 @@ class LayoutPrototypeTest(unittest.TestCase):
         )
         deck = build_map(cells, stations, crashes, None, None, 1.5, False)
         self.assertEqual(deck.layers[0].id, "crash-cells")
+        self.assertEqual(deck.initial_view_state.zoom, 8.6)
+
+    def test_fire_map_semantic_zoom_preserves_station_zoom_priority(self) -> None:
+        cells = pd.DataFrame(
+            {
+                "cell_id": ["cell"],
+                "center_latitude": [39.105],
+                "center_longitude": [-77.205],
+                "crash_count": [1],
+                "severity_breakdown": ["Fatal: 1"],
+                "nearest_station_name": ["A"],
+                "nearest_station_distance_km": [0.2],
+            }
+        )
+        crashes = pd.DataFrame(
+            {
+                "report_number": ["A"],
+                "crash_datetime": pd.to_datetime(["2026-01-05 01:00"]),
+                "cell_id": ["cell"],
+                "latitude": [39.101],
+                "longitude": [-77.201],
+                "road_name": ["A ROAD"],
+                "severity": ["Fatal Injury"],
+            }
+        )
+        stations = pd.DataFrame(
+            {
+                "station_name": ["A"],
+                "station_id": ["A"],
+                "address": ["1 Main St"],
+                "city": ["Test"],
+                "station_latitude": [39.2],
+                "station_longitude": [-77.3],
+            }
+        )
+
+        cell_deck = build_map(cells, stations, crashes, "cell", None, 3.0, False)
+        self.assertEqual(cell_deck.initial_view_state.zoom, 13.0)
+        self.assertEqual(
+            [layer.id for layer in cell_deck.layers],
+            ["crash-cells", "fire-stations", "selected-cell", "cell-crashes"],
+        )
+        station_deck = build_map(cells, stations, crashes, None, "A", 3.0, True)
+        self.assertEqual(station_deck.initial_view_state.zoom, 10.5)
+        self.assertAlmostEqual(station_deck.initial_view_state.latitude, 39.2)
 
     def test_app_renders_connected_fire_rescue_view(self) -> None:
         app = AppTest.from_file(str(PROJECT_ROOT / "app.py")).run(timeout=15)

@@ -10,6 +10,12 @@ import pandas as pd
 import pydeck as pdk
 import streamlit as st
 from . import colors
+from .map_layers import (
+    cell_view_state,
+    crash_point_layer,
+    grid_cell_layer,
+    selected_cell_layer,
+)
 
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data" / "processed" / "fire-and-rescue"
@@ -198,8 +204,9 @@ def _map_selection_from_event(event: object) -> tuple[str | None, str | None]:
         else getattr(selection, "objects", {})
     )
     cells = objects.get("crash-cells", [])
+    incidents = objects.get("cell-crashes", [])
     stations = objects.get("fire-stations", [])
-    cell_id = str(cells[0]["cell_id"]) if cells else None
+    cell_id = str((cells or incidents)[0]["cell_id"]) if cells or incidents else None
     station_id = str(stations[0]["station_id"]) if stations else None
     return cell_id, station_id
 
@@ -228,6 +235,7 @@ def _map_selection_callback(key: str) -> None:
     cell_id, station_id = _map_selection_from_event(st.session_state.get(key, {}))
     _set_selection(cell_id, station_id)
     st.session_state["fire_rescue_zoom_to_station"] = station_id is not None
+    st.session_state["fire_rescue_map_generation"] += 1
     st.session_state["fire_rescue_scatter_generation"] += 1
 
 
@@ -306,23 +314,7 @@ def build_map(
                 pickable=False,
             )
         )
-    layers.append(
-        pdk.Layer(
-            "ScatterplotLayer",
-            demand,
-            id="crash-cells",
-            get_position=["center_longitude", "center_latitude"],
-            get_radius=260,
-            get_fill_color="fill_color",
-            get_line_color=colors.MAP_LINE_COLOR,
-            radius_min_pixels=5,
-            radius_max_pixels=24,
-            line_width_min_pixels=1,
-            stroked=True,
-            pickable=True,
-            auto_highlight=True,
-        )
-    )
+    layers.append(grid_cell_layer(demand, "crash-cells"))
     if not radius_incidents.empty:
         layers.append(
             pdk.Layer(
@@ -357,21 +349,15 @@ def build_map(
             parameters={"depthTest": False},
         )
     )
-    if selected_cell and selected_cell in set(cells["cell_id"]):
-        layers.append(
-            pdk.Layer(
-                "ScatterplotLayer",
-                cells[cells["cell_id"].eq(selected_cell)],
-                id="selected-cell",
-                get_position=["center_longitude", "center_latitude"],
-                get_radius=520,
-                get_fill_color=colors.with_alpha(colors.SELECTED_RGB, 35),
-                get_line_color=colors.with_alpha(colors.SELECTED_RGB, 255),
-                line_width_min_pixels=3,
-                stroked=True,
-                pickable=False,
-            )
-        )
+    ring = selected_cell_layer(cells, selected_cell, "selected-cell", fill_alpha=35)
+    incidents = crash_point_layer(
+        filtered_crashes,
+        selected_cell,
+        "cell-crashes",
+        (("severity", "Severity"),),
+    )
+    layers.extend(layer for layer in (ring, incidents) if layer is not None)
+    view_state = cell_view_state(cells, selected_cell)
     if not selected_station_row.empty:
         layers.append(
             pdk.Layer(
@@ -391,21 +377,15 @@ def build_map(
             )
         )
         if zoom_to_station:
-            view_latitude = float(selected_station_row.iloc[0]["station_latitude"])
-            view_longitude = float(selected_station_row.iloc[0]["station_longitude"])
-            view_zoom = float(10.5 - np.log2(radius_km / 3))
-        else:
-            view_latitude, view_longitude, view_zoom = 39.12, -77.13, 8.6
-    else:
-        view_latitude, view_longitude, view_zoom = 39.12, -77.13, 8.6
+            view_state = pdk.ViewState(
+                latitude=float(selected_station_row.iloc[0]["station_latitude"]),
+                longitude=float(selected_station_row.iloc[0]["station_longitude"]),
+                zoom=float(10.5 - np.log2(radius_km / 3)),
+                pitch=0,
+            )
     return pdk.Deck(
         layers=layers,
-        initial_view_state=pdk.ViewState(
-            latitude=view_latitude,
-            longitude=view_longitude,
-            zoom=view_zoom,
-            pitch=0,
-        ),
+        initial_view_state=view_state,
         map_provider="carto",
         map_style=pdk.map_styles.CARTO_LIGHT,
         tooltip={

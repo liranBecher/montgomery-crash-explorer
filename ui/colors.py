@@ -3,9 +3,10 @@ from typing import Iterable, List, Sequence, Tuple
 
 
 # RGB anchors used across views
-STATION_RGB: Tuple[int, int, int] = (8, 127, 120)
-SELECTED_RGB: Tuple[int, int, int] = (20, 32, 43)
-WHITE_RGB: Tuple[int, int, int] = (255, 255, 255)
+STATION_RGB: Tuple[int, int, int] = (8, 127, 120)   # Teal
+SELECTED_RGB: Tuple[int, int, int] = (20, 32, 43)   # Dark blue
+WHITE_RGB: Tuple[int, int, int] = (255, 255, 255)   # White
+CRASH_POINT_RGB: Tuple[int, int, int] = (0, 0, 50)  # Dark navy
 
 
 def with_alpha(rgb: Sequence[int], alpha: int) -> List[int]:

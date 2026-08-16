@@ -1,8 +1,10 @@
 import unittest
+from unittest.mock import patch
 
 import pandas as pd
 
 from ui.safety_hotspots import (
+    _map_selection_callback,
     _map_cell_from_event,
     _time_from_event,
     aggregate_cells,
@@ -23,6 +25,9 @@ class SafetyHotspotsUiTest(unittest.TestCase):
                     ["2026-01-05 01:00", "2026-01-05 01:30", "2026-01-06 02:00", "2026-01-07 03:00"]
                 ),
                 "cell_id": ["39.00:-77.10", "39.00:-77.10", "39.01:-77.11", "39.02:-77.12"],
+                "latitude": [39.001, 39.002, 39.011, 39.021],
+                "longitude": [-77.101, -77.102, -77.111, -77.121],
+                "severity": ["No Apparent Injury", "Suspected Serious Injury", "No Apparent Injury", "No Apparent Injury"],
                 "weekday": ["Monday", "Monday", "Tuesday", "Wednesday"],
                 "hour": [1, 1, 2, 3],
                 "serious_or_fatal": [False, True, False, False],
@@ -71,11 +76,26 @@ class SafetyHotspotsUiTest(unittest.TestCase):
         cells = aggregate_cells(self.crashes)
         fingerprint = aggregate_fingerprint(self.crashes, "39.00:-77.10")
         timing = aggregate_timing(self.crashes, "Countywide", "Jan 1–Jan 31")
-        deck = build_map(cells, "39.00:-77.10", "Jan 1–Jan 31")
+        deck = build_map(cells, self.crashes, "39.00:-77.10", "Jan 1–Jan 31")
+        default_deck = build_map(cells, self.crashes, None, "Jan 1–Jan 31")
         heatmap = build_heatmap(timing, "Monday", 1).to_dict()
         comparison = build_fingerprint(fingerprint).to_dict()
 
-        self.assertEqual([layer.id for layer in deck.layers], ["safety-cells", "selected-safety-cell"])
+        self.assertEqual(
+            [layer.id for layer in deck.layers],
+            ["safety-cells", "selected-safety-cell", "safety-crashes"],
+        )
+        self.assertEqual(deck.initial_view_state.zoom, 13.0)
+        self.assertAlmostEqual(deck.initial_view_state.latitude, 39.005)
+        self.assertEqual([layer.id for layer in default_deck.layers], ["safety-cells"])
+        self.assertEqual(
+            (
+                default_deck.initial_view_state.latitude,
+                default_deck.initial_view_state.longitude,
+                default_deck.initial_view_state.zoom,
+            ),
+            (39.12, -77.13, 8.6),
+        )
         self.assertEqual(heatmap["params"][0]["name"], "safety_time_pick")
         self.assertEqual(len(comparison["vconcat"]), 3)
         self.assertEqual(
@@ -85,11 +105,33 @@ class SafetyHotspotsUiTest(unittest.TestCase):
             "39.00:-77.10",
         )
         self.assertEqual(
+            _map_cell_from_event(
+                {"selection": {"objects": {"safety-crashes": [{"cell_id": "39.00:-77.10"}]}}}
+            ),
+            "39.00:-77.10",
+        )
+        self.assertEqual(
             _time_from_event(
                 {"selection": {"safety_time_pick": [{"weekday": "Monday", "hour": 1}]}}
             ),
             ("Monday", 1),
         )
+
+    def test_map_selection_remounts_map_for_semantic_zoom(self) -> None:
+        state = {
+            "map": {
+                "selection": {
+                    "objects": {"safety-cells": [{"cell_id": "39.00:-77.10"}]}
+                }
+            },
+            "safety_map_generation": 2,
+            "safety_heatmap_generation": 4,
+        }
+        with patch("ui.safety_hotspots.st.session_state", state):
+            _map_selection_callback("map")
+
+        self.assertEqual(state["safety_selected_cell"], "39.00:-77.10")
+        self.assertEqual(state["safety_map_generation"], 3)
 
 
 if __name__ == "__main__":

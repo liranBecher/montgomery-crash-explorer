@@ -1,7 +1,115 @@
 # Visualization decisions
 
-This record captures the major data, design, and interaction decisions for
-the Fire & Rescue Proximity and Police Breathalyzers tabs.
+This record captures the major data, design, and interaction decisions for the
+Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
+
+## Shared map language and semantic zoom
+
+### Common visual system
+
+- The three crash maps are intended to behave as one mapping system rather than
+  three independently designed visuals.
+- They use the same countywide default viewport: latitude `39.12`, longitude
+  `-77.13`, zoom `8.6`.
+- The countywide view uses 0.01-degree aggregate grid cells so dense crash
+  patterns remain readable.
+- Aggregate cells use uniform-size circles. Marker size does not encode a
+  quantitative value; **color alone** carries the active map measure.
+- The maps share the same light CARTO basemap, white cell outline, warm
+  sequential low-to-high palette, hover highlighting, and dark selected-cell
+  ring.
+- The warm color scale is normalized to the active filtered data in each view.
+  Therefore the palette is visually consistent across tabs, but the same shade
+  of red does not imply the same absolute crash count in different tabs or
+  filter states.
+- Legends use the same visual vocabulary for the quantitative gradient and
+  selected grid cell. Domain-specific symbols, such as Fire & Rescue station
+  crosses and station-radius context, are added without changing the base map
+  language.
+
+### Standard crash-cell semantic zoom
+
+- Selecting a crash grid cell is the standard semantic zoom interaction across
+  Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers.
+- In the default state, only aggregate grid cells are shown and the map stays at
+  the countywide viewport.
+- Selecting a cell recentres the map on that cell, zooms to street level
+  (`zoom=13`), keeps the selected-cell ring and aggregate context, and reveals
+  the individual crash coordinates belonging to that selected cell.
+- Individual crashes use small circular markers with a subtle white outline,
+  fixed pixel sizing, sufficient opacity for overlap, and pickable tooltips.
+  They intentionally do not reuse the large aggregate-cell marker style.
+- Incident-marker radius is expressed as the literal `"pixels"` deck.gl unit so
+  point size remains stable while zooming and cannot expand into a large
+  geographic-radius disk.
+- Tooltip fields are normalized so aggregate cells and individual incidents can
+  share the deck-level tooltip structure while still exposing tab-specific
+  details such as date/time, severity, road, or alcohol status.
+- Clearing a cell selection removes the incident layer and restores the
+  countywide aggregate viewport. If filtering makes the selected cell invalid,
+  the selection and zoom are also reset.
+- A cell selected through a linked visualization should trigger the same map
+  drill-down behavior as a cell selected directly on the map.
+- Map selections use a fresh Streamlit map generation when the active semantic
+  level changes so the new viewport is actually applied rather than preserving
+  the previous client-side camera state.
+- Fire & Rescue station selection remains a separate semantic zoom mode and
+  takes priority over cell zoom when a station is selected.
+
+## Safety Hotspots
+
+### Purpose and scope
+
+- The tab asks where, when, and under which recorded conditions crashes
+  concentrate.
+- It uses the same 0.01-degree geographic cells as the other crash maps so the
+  spatial unit and interaction language stay consistent.
+- Users can switch between all classified crashes and a focused
+  suspected-serious/fatal mode.
+- The default date window is the latest five years, bounded by the available
+  data.
+- The incomplete 2026 source period is labelled wherever time comparisons may
+  be interpreted.
+
+### Map and semantic drill-down
+
+- Countywide crash concentrations are shown as uniform-size grid-cell circles,
+  with color encoding crash count.
+- Selecting a grid cell uses the shared semantic zoom behavior: the map moves to
+  street level, retains the selected-cell context, and reveals the exact crash
+  coordinates inside that cell.
+- Clearing the selection returns to the countywide aggregate view.
+- The selected-cell detail summarizes crash count, county share,
+  suspected-serious/fatal count, dominant route type, and common roads.
+
+### Condition fingerprint
+
+- The hotspot fingerprint compares the selected cell with the active county
+  baseline rather than presenting raw local percentages without context.
+- The comparison uses grouped condition families for Weather, Surface, and
+  Light.
+- Categories are ordered by county prevalence so the selected hotspot and the
+  baseline remain directly comparable.
+- Small selected samples are explicitly cautioned because percentages can be
+  unstable when the hotspot contains few crashes.
+
+### Linked crash timing
+
+- A weekday-by-hour heatmap shows the temporal distribution for the county or
+  the selected hotspot.
+- Selecting a weekday-hour cell filters the map and condition fingerprint to
+  that time window.
+- Selecting a map cell changes the heatmap geography to that selected cell.
+- Double-clicking the timing heatmap clears its time selection, while the main
+  clear action resets both the spatial and time selections.
+
+### Analytical cautions
+
+- The hotspot view describes recorded crash concentrations and conditions. It
+  does not estimate underlying traffic, pedestrian, or cyclist exposure and
+  does not establish causal risk.
+- The county comparison includes the selected cell; it is a contextual baseline
+  rather than a statistically independent control group.
 
 ## Fire & Rescue Proximity
 
@@ -13,8 +121,9 @@ the Fire & Rescue Proximity and Police Breathalyzers tabs.
   staffing, service areas, or operational performance.
 - The mapped station layer contains 37 usable stations. Station 27 / Public
   Safety Training Academy is excluded because it has no usable coordinates.
-- The analysis is based on 0.01-degree geographic cells, rather than individual
-  crash dots, to make spatial demand patterns readable.
+- The analysis is based on 0.01-degree geographic cells for the countywide
+  overview, with exact crash locations revealed only during semantic
+  drill-down.
 - Distances use the Haversine straight-line calculation in kilometres.
 
 ### Severity and filtering
@@ -43,11 +152,14 @@ the Fire & Rescue Proximity and Police Breathalyzers tabs.
 - Selecting a station displays its adjustable straight-line radius and the
   filtered crashes inside it. The radius is a proximity aid, not a coverage
   claim.
-- Countywide demand is aggregated into readable cells. Selecting a cell is the
-  semantic drill-down: the map zooms to that area and shows the underlying
-  crash coordinates; clearing the selection restores the aggregate overview.
+- Selecting a crash cell follows the shared semantic drill-down: the map zooms
+  to the cell, keeps aggregate context, and shows the underlying filtered crash
+  coordinates. Clearing the selection restores the aggregate county overview.
 - Fire-station markers remain visible during the cell drill-down so exact
   incidents retain their proximity context.
+- Station selection remains independent from cell selection. When a station is
+  selected, the station-specific viewport/radius behavior takes priority over
+  the regular cell semantic zoom.
 
 ### Companion views
 
@@ -130,10 +242,10 @@ the Fire & Rescue Proximity and Police Breathalyzers tabs.
 - The countywide map aggregates crashes into cells to keep dense patterns
   readable. Uniform marker size leaves color as the single quantitative map
   encoding.
-- Selecting an aggregate cell is the semantic zoom action: the map recentres at
-  street level and replaces the cell aggregation with the exact coordinates of
-  its underlying alcohol-related crashes. Clearing the selection restores the
-  countywide aggregation.
+- Selecting an aggregate cell follows the shared semantic zoom behavior: the
+  map recentres at street level, retains the selected-cell/aggregate context,
+  and overlays the exact coordinates of the underlying active alcohol-related
+  crashes. Clearing the selection restores the countywide aggregation.
 - Exact coordinates identify recorded crash locations, but they still do not
   by themselves identify a safe, legal, or operationally suitable checkpoint
   position.
@@ -147,8 +259,9 @@ the Fire & Rescue Proximity and Police Breathalyzers tabs.
 - A single clear action resets both spatial and time selections, and the
   summary text always states whether the current context is countywide or a
   selected cell and time.
-- For the day-time heatmap, we wanted to show the difference between day and night,
-  therefore the time axis is 6:00-5:00
+- The heatmap time axis runs from 06:00 through 05:00 so daytime/evening/night
+  patterns read as one continuous daily cycle rather than splitting the night
+  at midnight.
 
 ### Analytical cautions
 

@@ -3,11 +3,13 @@
 from datetime import date, timedelta
 from html import escape
 from pathlib import Path
+from statistics import mean
 
 import altair as alt
 import pandas as pd
 import pydeck as pdk
 import streamlit as st
+import streamlit.components.v1 as components
 
 from . import colors
 from .map_layers import (
@@ -152,6 +154,55 @@ def summarize_route_type(crashes: pd.DataFrame, selected_cell: str | None) -> st
         return "Not recorded"
     route_type = selected["route_group"].fillna("Not recorded").astype(str)
     return route_type.value_counts().idxmax()
+
+
+def calculate_signature_scores(fingerprint: pd.DataFrame, selected_cell: str | None = None) -> dict:
+    """Calculate total-variation distance for each crash-condition family."""
+    selected = fingerprint[fingerprint["geography"].eq("Selected hotspot")]
+    if fingerprint.empty or selected.empty:
+        return {
+            "selected_cell": selected_cell,
+            "families": {},
+            "overall": 0.0,
+            "selected_sample_size": 0,
+            "county_sample_size": 0,
+        }
+
+    county = fingerprint[fingerprint["geography"].eq("County baseline")]
+    county_size = int(county["sample_size"].max()) if not county.empty else 0
+    selected_size = int(selected["sample_size"].max()) if not selected.empty else 0
+    family_scores: dict[str, dict] = {}
+
+    for family in CONDITION_FAMILIES:
+        county_family = county[county["family"].eq(family)]
+        selected_family = selected[selected["family"].eq(family)]
+        if county_family.empty:
+            continue
+        county_share = county_family.set_index("category")["share_pct"].div(100).to_dict()
+        selected_share = selected_family.set_index("category")["share_pct"].div(100).to_dict() if not selected_family.empty else {}
+        categories = sorted(set(county_share) | set(selected_share))
+        distance = 0.5 * sum(abs(selected_share.get(category, 0.0) - county_share.get(category, 0.0)) for category in categories)
+
+        deltas = []
+        for category in categories:
+            delta_pp = (selected_share.get(category, 0.0) - county_share.get(category, 0.0)) * 100.0
+            if abs(delta_pp) > 0:
+                deltas.append({"category": category, "delta_pp": round(float(delta_pp), 1)})
+        family_scores[family] = {
+            "distance": float(distance),
+            "largest_differences": sorted(deltas, key=lambda item: abs(item["delta_pp"]), reverse=True)[:3],
+            "selected_sample_size": selected_size,
+            "county_sample_size": county_size,
+        }
+
+    overall = mean([family["distance"] for family in family_scores.values()]) if family_scores else 0.0
+    return {
+        "selected_cell": selected_cell,
+        "families": family_scores,
+        "overall": float(overall),
+        "selected_sample_size": selected_size,
+        "county_sample_size": county_size,
+    }
 
 
 def aggregate_timing(
@@ -334,6 +385,188 @@ def build_heatmap(
     )
 
 
+def build_hotspot_signature_svg(signature_scores: dict) -> str:
+    """Render the hotspot fingerprint markup as a standalone HTML/SVG component."""
+    ridge_paths = {
+        "Weather": [
+            "M128,26a101.58,101.58,0,0,0-34,5.81,6,6,0,1,0,4,11.31A90.07,90.07,0,0,1,218,128a283.42,283.42,0,0,1-7,62.67,6,6,0,1,0,11.7,2.66A295.41,295.41,0,0,0,230,128,102.12,102.12,0,0,0,128,26Z",
+            "M68,60.92A6,6,0,0,0,60,52a102.19,102.19,0,0,0-34,76,89.32,89.32,0,0,1-8.15,37.5,6,6,0,1,0,10.9,5A101.12,101.12,0,0,0,38,128,90.15,90.15,0,0,1,68,60.92Z",
+        ],
+        "Surface": [
+            "M128,86a42.08,42.08,0,0,1,31.31,14,6,6,0,1,0,8.94-8A54,54,0,0,0,74,128a138.08,138.08,0,0,1-17.22,66.82,6,6,0,1,0,10.49,5.82A150.07,150.07,0,0,0,86,128,42,42,0,0,1,128,86Z",
+            "M182,128a244.65,244.65,0,0,1-18.38,93.48,6,6,0,0,1-5.55,3.72,6.13,6.13,0,0,1-2.28-.45,6,6,0,0,1-3.27-7.84A232.64,232.64,0,0,0,170,128a6,6,0,0,1,12,0Z",
+        ],
+        "Light": [
+            "M128,122a6,6,0,0,0-6,6,186.54,186.54,0,0,1-5.86,46.5,6,6,0,0,0,4.32,7.31,5.93,5.93,0,0,0,1.5.19,6,6,0,0,0,5.8-4.5A198.75,198.75,0,0,0,134,128,6,6,0,0,0,128,122Z",
+            "M113.08,202.56a6,6,0,0,0-8,2.95c-2,4.24-4.09,8.47-6.36,12.57a6,6,0,0,0,2.34,8.15,5.88,5.88,0,0,0,2.9.76,6,6,0,0,0,5.25-3.09c2.42-4.36,4.7-8.87,6.78-13.39A6,6,0,0,0,113.08,202.56Z",
+        ],
+    }
+    family_colors = {"Weather": "#2f8f88", "Surface": "#d95f45", "Light": "#3b82f6"}
+
+    if not signature_scores.get("families"):
+        empty_paths = "".join(
+            f'<path class="mce-fingerprint-ridge ridge" d="{path}" />'
+            for paths in ridge_paths.values()
+            for path in paths
+        )
+        return """
+            <style>
+                * { box-sizing: border-box; }
+                body { margin: 0; font-family: system-ui, sans-serif; color: #5d6b78; }
+                .mce-fingerprint-empty { padding: 2px 0; }
+                svg { display: block; width: 100%; height: 220px; }
+                .ridge { fill: #9aabb4; fill-opacity: .32; stroke: rgba(20,32,43,0.9); stroke-width: 1.3; stroke-linejoin: round; stroke-linecap: round; }
+                .copy { display: grid; gap: 3px; font-size: 13px; }
+                .copy strong { color: #14202b; }
+            </style>
+            <div class="mce-fingerprint-empty" aria-label="Hotspot fingerprint empty state">
+                <svg viewBox="0 0 256 256" role="img" aria-label="Empty hotspot fingerprint">
+                    __EMPTY_PATHS__
+                </svg>
+                <div class="copy">
+                    <strong>Select a hotspot on the map to reveal its crash fingerprint.</strong>
+                    <span>The outline will summarize how its conditions differ from the county.</span>
+                </div>
+            </div>
+        """.replace("__EMPTY_PATHS__", empty_paths)
+
+    groups = []
+    tooltips = []
+    for family, paths in ridge_paths.items():
+        details = signature_scores["families"][family]
+        score = details["distance"]
+        similarity = 1.0 - score
+        opacity = 0.18 + similarity * 0.82
+        differences = "".join(
+            f"<li>{escape(item['category'])}: {item['delta_pp']:+.1f} pp</li>"
+            for item in details["largest_differences"]
+        ) or "<li>No category-level difference</li>"
+        paths_html = "".join(f'<path class="mce-fingerprint-ridge ridge" d="{path}" />' for path in paths)
+        hit_paths_html = "".join(f'<path class="hit-area" d="{path}" />' for path in paths)
+        tooltip_id = family.lower()
+        groups.append(
+            f'<g class="ridge-group {tooltip_id} {tooltip_id}-target" data-family="{tooltip_id}" tabindex="0" '
+            f'role="img" aria-label="{family}: {score:.1%} difference from county" '
+            f'style="--family-color:{family_colors[family]};--family-opacity:{opacity:.2f}">{paths_html}{hit_paths_html}</g>'
+        )
+        tooltips.append(
+            f'<div class="tooltip {tooltip_id}" role="tooltip"><strong>{family}</strong>'
+            f'<span>Difference from county: {score:.1%}</span><ul>{differences}</ul>'
+            f'<small>Selected n={details["selected_sample_size"]:,} · County n={details["county_sample_size"]:,}</small></div>'
+        )
+
+    overall_difference = signature_scores["overall"]
+    similarity = 1.0 - overall_difference
+
+    return f"""
+        <style>
+            * {{ box-sizing: border-box; }}
+            body {{ margin: 0; font-family: system-ui, sans-serif; color: #344451; }}
+            .card {{ padding: 2px 0; }}
+            .header {{
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                color: #14202b;
+                font-size: 13px;
+                font-weight: 700;
+            }}
+            .summary {{ display: grid; text-align: right; white-space: nowrap; }}
+            .summary strong {{ font-size: 18px; }}
+            .summary small {{ color: #5d6b78; font-size: 11px; font-weight: 400; }}
+            .figure {{ position: relative; margin-top: 5px; }}
+            svg {{
+                display: block;
+                width: 100%; height: 220px;
+            }}
+            .ridge-group {{
+                cursor: help; outline: none;
+            }}
+            .ridge-group .ridge {{
+                fill: var(--family-color);
+                fill-opacity: var(--family-opacity);
+                stroke: var(--family-color);
+                stroke-width: 4;
+                stroke-linejoin: round;
+                stroke-linecap: round;
+                transition: fill-opacity .15s ease, filter .15s ease;
+            }}
+            .hit-area {{
+                fill: transparent; stroke: transparent; stroke-width: 16px; pointer-events: all;
+            }}
+            .ridge-group:hover .ridge, .ridge-group:focus .ridge {{
+                filter: drop-shadow(0 0 2px rgba(20,32,43,.28));
+            }}
+            svg:has(.ridge-group:hover) .ridge-group:not(:hover) .ridge,
+            svg:has(.ridge-group:focus) .ridge-group:not(:focus) .ridge {{
+                fill-opacity: .10;
+            }}
+            .card:has(.weather-target:is(:hover,:focus)) .ridge-group:not(.weather) .ridge,
+            .card:has(.surface-target:is(:hover,:focus)) .ridge-group:not(.surface) .ridge,
+            .card:has(.light-target:is(:hover,:focus)) .ridge-group:not(.light) .ridge {{
+                fill-opacity: .10;
+            }}
+            .card:has(.weather-target:is(:hover,:focus)) .weather .ridge,
+            .card:has(.surface-target:is(:hover,:focus)) .surface .ridge,
+            .card:has(.light-target:is(:hover,:focus)) .light .ridge {{
+                filter: drop-shadow(0 0 2px rgba(20,32,43,.28));
+                cursor: help; outline: none;
+            }}
+            .tooltip {{
+                position: absolute; top: 10px; left: 10px; z-index: 2;
+                display: grid; gap: 3px; width: min(310px, calc(100% - 20px));
+                padding: 9px 11px; border: 1px solid rgba(100, 118, 116, 0.28);
+                border-radius: 8px; background: rgba(246, 240, 230, 0.96);
+                color: #344451; font-size: 12px;
+                box-shadow: 0 6px 18px rgba(40, 56, 49, .12);
+                opacity: 0; pointer-events: none; transition: opacity .12s ease;
+            }}
+            .tooltip strong {{ color: #14202b; font-size: 13px; }}
+            .tooltip ul {{ margin: 2px 0; padding-left: 18px; }}
+            .card:has(.weather-target:is(:hover,:focus)) .tooltip.weather,
+            .card:has(.surface-target:is(:hover,:focus)) .tooltip.surface,
+            .card:has(.light-target:is(:hover,:focus)) .tooltip.light {{ opacity: 1; }}
+            .legend {{
+                display: grid; grid-template-columns: 1fr 1fr; gap: 7px 14px;
+                margin-top: 7px; font-size: 12px;
+            }}
+            .legend-row {{ display: flex; align-items: center; gap: 7px; min-width: 0; }}
+            .line {{ width: 35px; border-top: 3px solid #a8b5a9; flex: 0 0 auto; }}
+            .faint {{ opacity: .2; }} .solid {{ opacity: 1; }}
+            .zone {{
+                min-width: 51px; padding: 2px 5px; border: 1px solid #9db1bb;
+                border-radius: 999px; color: #5d6b78; font-size: 9px;
+                font-weight: 700; letter-spacing: .04em; text-align: center;
+            }}
+            .family-swatch {{
+                width: 25px; border-top: 4px solid var(--swatch-color); flex: 0 0 auto;
+            }}
+            .family-target {{ cursor: help; border-radius: 5px; outline: none; }}
+            .family-target:is(:hover,:focus) {{ color: #14202b; font-weight: 600; }}
+        </style>
+        <div class="card" aria-label="Hotspot fingerprint visualization">
+            <div class="header">
+                <strong>Difference from county baseline</strong>
+                <span class="summary"><strong>{similarity:.1%} similar</strong><small>{overall_difference:.1%} average difference</small></span>
+            </div>
+            <div class="figure">
+                <svg viewBox="0 0 256 256" role="img" aria-label="Crash fingerprint for the selected hotspot">
+                    {''.join(groups)}
+                </svg>
+                {''.join(tooltips)}
+            </div>
+            <div class="legend" aria-label="Fingerprint legend">
+                <div class="legend-row"><span class="line faint"></span><span>Faint fill — more different</span></div>
+                <div class="legend-row family-target weather-target" tabindex="0"><span class="family-swatch" style="--swatch-color:{family_colors['Weather']}"></span><span>Weather · {1 - signature_scores['families']['Weather']['distance']:.1%} similar</span></div>
+                <div class="legend-row"><span class="line solid"></span><span>Solid outline — fixed reference</span></div>
+                <div class="legend-row family-target surface-target" tabindex="0"><span class="family-swatch" style="--swatch-color:{family_colors['Surface']}"></span><span>Surface · {1 - signature_scores['families']['Surface']['distance']:.1%} similar</span></div>
+                <div></div><div class="legend-row family-target light-target" tabindex="0"><span class="family-swatch" style="--swatch-color:{family_colors['Light']}"></span><span>Light · {1 - signature_scores['families']['Light']['distance']:.1%} similar</span></div>
+            </div>
+        </div>
+    """
+
+
 def _render_map_legend(cells: pd.DataFrame) -> None:
     st.markdown(
         f"""
@@ -412,6 +645,8 @@ def render_safety_hotspots_visuals(
     timing_crashes = filtered if selected_cell is None else filtered[filtered["cell_id"].eq(selected_cell)]
     geography = f"Grid cell {selected_cell}" if selected_cell else "Countywide"
     timing = aggregate_timing(timing_crashes, geography, date_label)
+    fingerprint = aggregate_fingerprint(linked, selected_cell)
+    selected_size = len(linked[linked["cell_id"].eq(selected_cell)]) if selected_cell else 0
 
     summary, clear = st.columns([3.5, 1])
     with summary:
@@ -433,7 +668,7 @@ def render_safety_hotspots_visuals(
             st.session_state["safety_heatmap_generation"] = heatmap_generation + 1
             st.rerun()
 
-    map_column, fingerprint_column = st.columns([1.25, 1], gap="medium")
+    map_column, conditions_column = st.columns([1.25, 1], gap="medium")
     with map_column:
         st.subheader("Crash hotspots by grid cell")
         if mapped.empty:
@@ -463,6 +698,19 @@ def render_safety_hotspots_visuals(
                     """,
                     unsafe_allow_html=True,
                 )
+
+    with conditions_column:
+        st.subheader("Crash conditions")
+        if selected_cell is None:
+            st.caption(f"County baseline n={len(linked):,} · categories sorted by county share")
+        else:
+            st.caption(
+                f"Selected hotspot n={selected_size:,} · county baseline n={len(linked):,} · categories sorted by county share"
+            )
+        st.altair_chart(build_fingerprint(fingerprint), width="stretch")
+
+    timing_column, signature_column = st.columns([1.25, 1], gap="medium")
+    with timing_column:
         st.subheader("Crash timing")
         st.caption("Select a weekday-hour cell to filter the map and fingerprint; double-click the heatmap to clear the time selection.")
         heatmap_key = f"safety_heatmap_{heatmap_generation}"
@@ -473,18 +721,15 @@ def render_safety_hotspots_visuals(
             selection_mode="safety_time_pick",
             width="stretch",
         )
-    with fingerprint_column:
+    with signature_column:
         st.subheader("Hotspot fingerprint")
-        fingerprint = aggregate_fingerprint(linked, selected_cell)
-        if selected_cell is None:
-            st.caption(f"County baseline n={len(linked):,} · categories sorted by county share")
-        else:
-            selected_size = len(linked[linked["cell_id"].eq(selected_cell)])
-            st.caption(
-                f"Selected hotspot n={selected_size:,} · county baseline n={len(linked):,} · categories sorted by county share"
-            )
-        st.altair_chart(build_fingerprint(fingerprint), width="stretch")
-        if selected_cell is not None and len(linked[linked["cell_id"].eq(selected_cell)]) < 30:
+        st.caption("More opaque zones are more similar to the county baseline; faint zones are more different. Hover any colored zone or legend item for details.")
+        components.html(
+            build_hotspot_signature_svg(calculate_signature_scores(fingerprint, selected_cell)),
+            height=350,
+            scrolling=False,
+        )
+        if selected_cell is not None and selected_size < 30:
             st.warning("This selected hotspot has fewer than 30 crashes; compare percentages cautiously.")
 
     st.caption(

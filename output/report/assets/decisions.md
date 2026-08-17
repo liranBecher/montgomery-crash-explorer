@@ -92,6 +92,21 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
   baseline remain directly comparable.
 - Small selected samples are explicitly cautioned because percentages can be
   unstable when the hotspot contains few crashes.
+- The fingerprint uses a ridge-style SVG for each condition family so the visual
+  encoding stays compact while still comparing a selected hotspot against the
+  county baseline.
+- The ridge outline is intentionally a fixed reference: a fully opaque stroke
+  marks the constant benchmark, while the fill opacity inside that outline tracks
+  how different the selected hotspot is from the county pattern.
+- The outline color matches the groove/family color to make cross-family
+  comparison easy without requiring a separate legend to decode the border.
+- The ridge outline was widened so the reference remains legible at small sizes.
+- The central neutral interior was softened away from stark black/gray/white to
+  reduce visual dominance and to keep the focus on the family color and the
+  relative fill opacity.
+- The Light family uses a blue accent to remain visually distinct from the teal
+  Weather and warm orange Surface strokes while still fitting the shared map
+  palette.
 
 ### Linked crash timing
 

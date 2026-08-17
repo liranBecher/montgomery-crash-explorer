@@ -13,6 +13,8 @@ from ui.safety_hotspots import (
     build_fingerprint,
     build_heatmap,
     build_map,
+    build_hotspot_signature_svg,
+    calculate_signature_scores,
 )
 
 
@@ -116,6 +118,26 @@ class SafetyHotspotsUiTest(unittest.TestCase):
             ),
             ("Monday", 1),
         )
+
+    def test_calculates_hotspot_signature_scores(self) -> None:
+        fingerprint = aggregate_fingerprint(self.crashes, "39.00:-77.10")
+        scores = calculate_signature_scores(fingerprint)
+
+        self.assertIn("Weather", scores["families"])
+        self.assertGreater(scores["overall"], 0)
+        self.assertEqual(scores["selected_sample_size"], 2)
+        self.assertEqual(scores["county_sample_size"], 4)
+        self.assertIn("largest_differences", scores["families"]["Weather"])
+
+    def test_builds_empty_and_selected_signature_svg(self) -> None:
+        empty_svg = build_hotspot_signature_svg({"selected_cell": None, "families": {}})
+        self.assertIn("Select a hotspot", empty_svg)
+        self.assertIn("mce-fingerprint-empty", empty_svg)
+
+        fingerprint = aggregate_fingerprint(self.crashes, "39.00:-77.10")
+        selected_svg = build_hotspot_signature_svg(calculate_signature_scores(fingerprint))
+        self.assertIn("Weather", selected_svg)
+        self.assertIn("mce-fingerprint-ridge", selected_svg)
 
     def test_map_selection_remounts_map_for_semantic_zoom(self) -> None:
         state = {

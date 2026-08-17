@@ -757,7 +757,10 @@ def render_fire_rescue_visuals(
 
     map_column, scatter_column = st.columns([1.65, 0.9], gap="medium")
     with map_column:
-        st.subheader("Crash demand and mapped stations")
+        st.subheader(
+            "Crash demand and mapped stations",
+            help="Explore crash clusters across the county. See how fire stations are spread to cover crashes."
+            )
         render_map_legend(visible_cells, selected_station)
         map_key = f"fire_rescue_map_{map_generation}"
         st.pydeck_chart(
@@ -784,8 +787,10 @@ def render_fire_rescue_visuals(
             radius_km,
         )
     with scatter_column:
-        st.subheader("Demand versus station proximity")
-        st.caption("Cells toward the upper-right combine more crashes with greater distance.")
+        st.subheader(
+            "Demand versus station proximity",
+            help="Cells toward the upper-right combine more crashes with greater distance."
+            )
         render_scatter_legend()
         scatter_key = f"fire_rescue_scatter_{scatter_generation}"
         st.altair_chart(
@@ -795,8 +800,10 @@ def render_fire_rescue_visuals(
             selection_mode="cell_pick",
         )
 
-    st.subheader("Filtered crashes near mapped stations")
-    st.caption("Use the controls below to rank stations and change the radius used for the bar chart and map radius overlay.")
+    st.subheader(
+        "Filtered crashes near mapped stations",
+        help="Use the controls below to rank stations and change the radius used for the bar chart and map radius overlay."
+        )
     activity_column, station_limit_column, radius_column = st.columns(3)
     with activity_column:
         activity_mode = st.selectbox(

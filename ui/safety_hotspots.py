@@ -704,7 +704,11 @@ def render_safety_hotspots_visuals(
                 )
 
     with conditions_column:
-        st.subheader("Crash conditions")
+        st.subheader(
+            "Crash conditions",
+            help="Explore the difference between the selected hotspot (red) and the county's average (green).\n\n"
+            "The 3 charts show weather, surface condition, and lit was the area at the time of the report."
+        )
         if selected_cell is None:
             st.caption(f"County average n={len(linked):,} · categories sorted by county share")
         else:
@@ -715,7 +719,10 @@ def render_safety_hotspots_visuals(
 
     timing_column, signature_column = st.columns([1.25, 1], gap="medium")
     with timing_column:
-        st.subheader("Crash timing")
+        st.subheader(
+            "Crash timing",
+            help="See when (day of the week and hour) occure more often"
+        )
         st.caption("Select a weekday-hour cell to filter the map and fingerprint; double-click the heatmap to clear the time selection.")
         heatmap_key = f"safety_heatmap_{heatmap_generation}"
         st.altair_chart(

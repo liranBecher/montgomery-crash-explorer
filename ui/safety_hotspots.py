@@ -108,7 +108,7 @@ def aggregate_cells(crashes: pd.DataFrame) -> pd.DataFrame:
 
 
 def aggregate_fingerprint(crashes: pd.DataFrame, selected_cell: str | None = None) -> pd.DataFrame:
-    """Compare the active county baseline against an optional selected hotspot."""
+    """Compare the active county average against an optional selected hotspot."""
     selected = crashes[crashes["cell_id"].eq(selected_cell)] if selected_cell else crashes.iloc[0:0]
     frames = []
     for family, (column, categories) in CONDITION_FAMILIES.items():
@@ -119,7 +119,7 @@ def aggregate_fingerprint(crashes: pd.DataFrame, selected_cell: str | None = Non
                 {
                     "family": family,
                     "category": categories,
-                    "geography": "County baseline",
+                    "geography": "County average",
                     "crash_count": county_counts.to_numpy(),
                     "share_pct": county_counts.div(len(crashes) or 1).mul(100).to_numpy(),
                     "sample_size": len(crashes),
@@ -168,7 +168,7 @@ def calculate_signature_scores(fingerprint: pd.DataFrame, selected_cell: str | N
             "county_sample_size": 0,
         }
 
-    county = fingerprint[fingerprint["geography"].eq("County baseline")]
+    county = fingerprint[fingerprint["geography"].eq("County average")]
     county_size = int(county["sample_size"].max()) if not county.empty else 0
     selected_size = int(selected["sample_size"].max()) if not selected.empty else 0
     family_scores: dict[str, dict] = {}
@@ -304,7 +304,7 @@ def build_fingerprint(fingerprint: pd.DataFrame) -> alt.VConcatChart:
     for family in CONDITION_FAMILIES:
         plotted = fingerprint[fingerprint["family"].eq(family)]
         order = (
-            plotted[plotted["geography"].eq("County baseline")]
+            plotted[plotted["geography"].eq("County average")]
             .sort_values("category_order")["category"]
             .tolist()
         )
@@ -319,7 +319,7 @@ def build_fingerprint(fingerprint: pd.DataFrame) -> alt.VConcatChart:
                     "geography:N",
                     title=None,
                     scale=alt.Scale(
-                        domain=["Selected hotspot", "County baseline"],
+                        domain=["Selected hotspot", "County average"],
                         range=["#d95f45", "#69aaa4"],
                     ),
                 ),
@@ -547,7 +547,7 @@ def build_hotspot_signature_svg(signature_scores: dict) -> str:
         </style>
         <div class="card" aria-label="Hotspot fingerprint visualization">
             <div class="header">
-                <strong>Difference from county baseline</strong>
+                <strong>Difference from county Average</strong>
                 <span class="summary"><strong>{similarity:.1%} similar</strong><small>{overall_difference:.1%} average difference</small></span>
             </div>
             <div class="figure">
@@ -586,7 +586,7 @@ def render_safety_hotspots_view() -> None:
         """
         <div class="mce-view-heading">
             <h2>Where, when, and under which conditions do crashes concentrate?</h2>
-            <p>Select a roughly 1 km grid cell to compare its recorded conditions with the county baseline and inspect its crash timing.</p>
+            <p>Select a roughly 1 km grid cell to compare its recorded conditions with the county average and inspect its crash timing.</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -670,7 +670,11 @@ def render_safety_hotspots_visuals(
 
     map_column, conditions_column = st.columns([1.25, 1], gap="medium")
     with map_column:
-        st.subheader("Crash hotspots by grid cell")
+        st.subheader(
+            "Crash hotspots by grid cell",
+            help="Each circle is a crash cell. Darker color means more crashes for the selected "
+                "filtering. Click a cell to focus the timing chart on that cell."
+            )
         if mapped.empty:
             st.warning("No crashes match the selected time window.")
         else:
@@ -702,10 +706,10 @@ def render_safety_hotspots_visuals(
     with conditions_column:
         st.subheader("Crash conditions")
         if selected_cell is None:
-            st.caption(f"County baseline n={len(linked):,} · categories sorted by county share")
+            st.caption(f"County average n={len(linked):,} · categories sorted by county share")
         else:
             st.caption(
-                f"Selected hotspot n={selected_size:,} · county baseline n={len(linked):,} · categories sorted by county share"
+                f"Selected hotspot n={selected_size:,} · county average n={len(linked):,} · categories sorted by county share"
             )
         st.altair_chart(build_fingerprint(fingerprint), width="stretch")
 
@@ -722,8 +726,11 @@ def render_safety_hotspots_visuals(
             width="stretch",
         )
     with signature_column:
-        st.subheader("Hotspot fingerprint")
-        st.caption("More opaque zones are more similar to the county baseline; faint zones are more different. Hover any colored zone or legend item for details.")
+        st.subheader(
+            "Hotspot fingerprint",
+            help=("More opaque zones are more similar to the county average."
+            "\n\nFaint zones are more different. Hover any colored zone or legend item for details.")
+        )
         components.html(
             build_hotspot_signature_svg(calculate_signature_scores(fingerprint, selected_cell)),
             height=350,
@@ -733,7 +740,7 @@ def render_safety_hotspots_visuals(
             st.warning("This selected hotspot has fewer than 30 crashes; compare percentages cautiously.")
 
     st.caption(
-        "All classified crashes excludes records without joinable person-level injury severity. The county fingerprint baseline includes the selected cell. Grid cells are 0.01° (approximately 1 km); results describe recorded crashes, not underlying exposure or causal risk."
+        "All classified crashes excludes records without joinable person-level injury severity. The county fingerprint average includes the selected cell. Grid cells are 0.01° (approximately 1 km); results describe recorded crashes, not underlying exposure or causal risk."
     )
     if end_date.year == 2026:
         st.caption("The 2026 source snapshot ends on August 5 and is incomplete for annual comparisons.")

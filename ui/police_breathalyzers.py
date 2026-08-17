@@ -208,45 +208,92 @@ def build_heatmap(
     selected_weekday: str | None,
     selected_hour: int | None,
 ) -> alt.Chart:
-    """Build the linked weekday-by-hour alcohol timing heatmap."""
+    """Build the linked concentric weekday-by-hour alcohol timing heatmap."""
+    import math
+
     value_column, value_label = MAP_MEASURES[measure]
+    plotted = timing.copy()
+    hour_order = list(range(6, 24)) + list(range(0, 6))
+    hour_position = {hour: index for index, hour in enumerate(hour_order)}
+    weekday_position = {day: index for index, day in enumerate(WEEKDAYS)}
+    angle_step = 2 * math.pi / 24
+
+    plotted["theta_start"] = plotted["hour"].map(
+        lambda hour: hour_position[int(hour)] * angle_step
+    )
+    plotted["theta_end"] = plotted["theta_start"] + angle_step
+    inner_radius, ring_width = 55, 24
+    plotted["radius_inner"] = plotted["weekday"].map(
+        lambda day: inner_radius + weekday_position[day] * ring_width
+    )
+    plotted["radius_outer"] = plotted["radius_inner"] + ring_width
+    plotted["hour_label"] = plotted["hour"].map(lambda hour: f"{int(hour):02d}:00")
+
     time_pick = alt.selection_point(
-        name="time_pick", fields=["weekday", "hour"], toggle=False, clear="dblclick", empty=False
+        name="time_pick", fields=["weekday", "hour"], toggle=False,
+        clear="dblclick", empty=False,
     )
     selected = (
         (alt.datum.weekday == selected_weekday) & (alt.datum.hour == selected_hour)
-        if selected_weekday is not None
-        else time_pick
+        if selected_weekday is not None else time_pick
     )
-    return (
-        alt.Chart(timing)
-        .mark_rect(cornerRadius=2)
-        .encode(
-            x=alt.X(
-                "hour:O",
-                title="Hour of day",
-                sort=list(range(6, 24)) + list(range(0, 6)),
-                axis=alt.Axis(labelExpr="(datum.value < 10 ? '0' : '') + datum.value + ':00'", labelAngle=-45),
-            ),
-            y=alt.Y("weekday:N", title=None, sort=WEEKDAYS),
+    heatmap = (
+        alt.Chart(plotted).mark_arc(cornerRadius=1, padAngle=0.006).encode(
+            theta=alt.Theta("theta_start:Q", scale=None),
+            theta2=alt.Theta2("theta_end:Q"),
+            radius=alt.Radius("radius_outer:Q", scale=None),
+            radius2=alt.Radius2("radius_inner:Q"),
             color=alt.Color(
-                f"{value_column}:Q",
-                title=value_label,
+                f"{value_column}:Q", title=value_label,
                 scale=alt.Scale(range=colors.HEATMAP_RANGE, zero=True),
             ),
             stroke=alt.condition(selected, alt.value("#14202b"), alt.value("#ffffff")),
-            strokeWidth=alt.condition(selected, alt.value(3), alt.value(0.5)),
+            strokeWidth=alt.condition(selected, alt.value(3), alt.value(0.7)),
+            opacity=alt.condition(selected, alt.value(1.0), alt.value(0.9)),
             tooltip=[
                 alt.Tooltip("weekday:N", title="Day"),
-                alt.Tooltip("hour:O", title="Hour"),
-                alt.Tooltip("alcohol_count:Q", title="Alcohol-related crashes"),
-                alt.Tooltip("total_crashes:Q", title="All crashes"),
+                alt.Tooltip("hour_label:N", title="Hour"),
+                alt.Tooltip("alcohol_count:Q", title="Alcohol-related crashes", format=","),
+                alt.Tooltip("total_crashes:Q", title="All crashes", format=","),
                 alt.Tooltip("alcohol_share_pct:Q", title="Alcohol-related share (%)", format=".2f"),
             ],
-        )
-        .add_params(time_pick)
-        .properties(height=430)
+        ).add_params(time_pick)
     )
+
+    label_hours = [6, 8, 10, 12, 14, 16, 18, 20, 22, 0, 2, 4]
+    hour_labels = pd.DataFrame({"hour": label_hours, "label": [f"{hour:02d}:00" for hour in label_hours]})
+    hour_labels["theta"] = hour_labels["hour"].map(
+        lambda hour: (hour_position[int(hour)] + 0.5) * angle_step
+    )
+    # Keep labels just inside the outer ring so the left-side times are not clipped.
+    hour_labels["radius"] = inner_radius + len(WEEKDAYS) * ring_width + 16
+    hour_label_chart = alt.Chart(hour_labels).mark_text(
+        fontSize=12, color="#5f6b76", baseline="middle"
+    ).encode(
+        theta=alt.Theta("theta:Q", scale=None),
+        radius=alt.Radius("radius:Q", scale=None), text="label:N",
+    )
+
+    # Weekday labels centered on each ring
+    weekday_labels = pd.DataFrame({
+        "weekday": WEEKDAYS,
+        "label": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    })
+    weekday_labels["radius"] = weekday_labels["weekday"].map(
+        lambda day: inner_radius + weekday_position[day] * ring_width + ring_width / 2
+    )
+    weekday_labels["theta"] = 0
+    weekday_label_chart = alt.Chart(weekday_labels).mark_text(
+        fontSize=11, fontWeight="bold", color="#5f6b76", align="right", dx=-5
+    ).encode(
+        theta=alt.Theta("theta:Q", scale=None),
+        radius=alt.Radius("radius:Q", scale=None), text="label:N",
+    )
+
+    return alt.layer(heatmap, hour_label_chart, weekday_label_chart).properties(
+        width=500, height=550
+    )
+
 
 
 def render_legend(cells: pd.DataFrame, measure: str) -> None:
@@ -388,7 +435,13 @@ def render_police_breathalyzer_visuals(
 
     map_column, timing_column = st.columns([1.2, 1], gap="medium")
     with map_column:
-        st.subheader("Alcohol-related crashes by grid cell")
+        st.subheader(
+            "Alcohol-related crashes by grid cell",
+            help=(
+                "Each circle is a crash cell. Darker color means more crashes for the selected "
+                "filtering. Click a cell to focus the timing chart on that cell."
+            ),
+        )
         if mapped.empty:
             st.warning("No grid cells meet the current filters and minimum sample. Try a lower minimum sample.")
         else:
@@ -415,7 +468,14 @@ def render_police_breathalyzer_visuals(
                     unsafe_allow_html=True,
                 )
     with timing_column:
-        st.subheader("Alcohol-related crash timing")
+        st.subheader(
+            "Alcohol-related crash timing",
+            help=(
+                "Inner-to-outer rings are Monday through Sunday, and each radial segment is an hour. "
+                "Darker color means more crashes for the selected measure. Click a weekday-hour "
+                "segment to filter the map."
+            ),
+        )
         st.caption("Select a weekday-hour cell to filter the map; double-click the heatmap to clear its time selection.")
         heatmap_key = f"alcohol_heatmap_{heatmap_generation}"
         st.altair_chart(
@@ -425,6 +485,8 @@ def render_police_breathalyzer_visuals(
             selection_mode="time_pick",
             width="stretch",
         )
+        st.caption("Weekday rings, inner → outer: Monday · Tuesday · Wednesday · Thursday · Friday · Saturday · Sunday. Radial segments show hours.")
+
 
     st.caption(
         "Alcohol-related includes recorded alcohol present/contributed, suspected alcohol use, and combined-substance labels selected above. Shares use all geocoded crashes in the same active cell and time window as the denominator. These are historical police records, not BAC tests, causal findings, or enforcement recommendations."

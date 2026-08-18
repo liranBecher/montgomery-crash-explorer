@@ -22,10 +22,10 @@ def map_fill_colors(positions: Iterable[float]) -> List[List[int]]:
     The palette matches the Fire & Rescue view: light warm -> deep orange/red.
     """
     return [
-        [255, int(235 - 185 * float(v)), int(170 - 150 * float(v)), 205]
+        [255, int(235 - 185 * float(v)), int(170 - 150 * float(v)), 100]
         for v in positions
     ]
 
 
 # Heatmap continuous range matching the same warm palette (low -> high)
-HEATMAP_RANGE = ["#FFEBAA", "#FF8E5F", "#FF3214"]
+HEATMAP_RANGE = ["#BEE1FA", "#928FC0", "#462D8C"]

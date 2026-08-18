@@ -169,35 +169,91 @@ def build_map(
 ) -> pdk.Deck:
     """Build the alcohol-related cell map."""
     value_column, value_label = MAP_MEASURES[measure]
+
     plotted = cells.copy()
-    minimum, maximum = plotted[value_column].min(), plotted[value_column].max()
-    position = (plotted[value_column] - minimum) / max(maximum - minimum, 1)
+
+    minimum = plotted[value_column].min()
+    maximum = plotted[value_column].max()
+
+    position = (
+        plotted[value_column] - minimum
+    ) / max(maximum - minimum, 1)
+
     plotted["fill_color"] = colors.map_fill_colors(position)
+    plotted["original_fill_color"] = plotted["fill_color"]
+
     plotted["title"] = "Grid cell " + plotted["cell_id"]
+
     plotted["line_1"] = plotted["alcohol_count"].map(
         lambda value: f"Alcohol-related crashes: {value:,}"
     )
+
     plotted["line_2"] = plotted.apply(
-        lambda row: f"Share: {row['alcohol_share_pct']:.1f}% of {row['total_crashes']:,} crashes",
+        lambda row: (
+            f"Share: {row['alcohol_share_pct']:.1f}% "
+            f"of {row['total_crashes']:,} crashes"
+        ),
         axis=1,
     )
+
     plotted["line_3"] = plotted["status_breakdown"]
     plotted["line_4"] = "Roads: " + plotted["common_roads"].astype(str)
-    layers = [grid_cell_layer(plotted, "alcohol-cells")]
-    ring = selected_cell_layer(cells, selected_cell, "selected-alcohol-cell")
+
+    # Remove selected cell from the hoverable base layer
+    if selected_cell:
+        base_cells = plotted[
+            ~plotted["cell_id"].eq(selected_cell)
+        ].copy()
+    else:
+        base_cells = plotted.copy()
+
+    layers = [
+        grid_cell_layer(
+            base_cells,
+            "alcohol-cells",
+        )
+    ]
+
+    ring = selected_cell_layer(
+        plotted,
+        selected_cell,
+        "selected-alcohol-cell",
+        fill_alpha=12,
+    )
+
     incidents = crash_point_layer(
         crashes,
         selected_cell,
         "alcohol-crashes",
-        (("alcohol_status", "Alcohol status"), ("municipality", "Municipality")),
+        (
+            ("alcohol_status", "Alcohol status"),
+            ("municipality", "Municipality"),
+        ),
     )
-    layers.extend(layer for layer in (ring, incidents) if layer is not None)
+
+    layers.extend(
+        layer
+        for layer in (ring, incidents)
+        if layer is not None
+    )
+
     return pdk.Deck(
         layers=layers,
-        initial_view_state=cell_view_state(cells, selected_cell),
+        initial_view_state=cell_view_state(
+            cells,
+            selected_cell,
+        ),
         map_provider="carto",
         map_style=pdk.map_styles.CARTO_LIGHT,
-        tooltip={"html": "<b>{title}</b><br>{line_1}<br>{line_2}<br>{line_3}<br>{line_4}"},
+        tooltip={
+            "html": (
+                "<b>{title}</b><br>"
+                "{line_1}<br>"
+                "{line_2}<br>"
+                "{line_3}<br>"
+                "{line_4}"
+            )
+        },
         description=f"Map colored by {value_label.lower()}",
     )
 
@@ -305,7 +361,7 @@ def render_legend(cells: pd.DataFrame, measure: str) -> None:
         f"""
         <section class="mce-viz-legend" aria-label="Alcohol map legend">
             <strong>Map legend</strong>
-            <span class="mce-legend-item"><span class="mce-legend-gradient" aria-hidden="true"></span>{escape(value_label)}: {formatted}; uniform marker size</span>
+            <span class="mce-legend-item"><span class="mce-legend-gradient" aria-hidden="true"></span>{escape(value_label)} per grid cell: {formatted}</span>
             <span class="mce-legend-item"><span class="mce-legend-ring" aria-hidden="true"></span>Selected grid cell</span>
         </section>
         """,
@@ -438,8 +494,9 @@ def render_police_breathalyzer_visuals(
         st.subheader(
             "Alcohol-related crashes by grid cell",
             help=(
-                "Each circle is a crash cell. Darker color means more crashes for the selected "
-                "filtering. Click a cell to focus the timing chart on that cell."
+                "Each grid tile represents an aggregated crash cell. Darker color means more "
+                "crashes for the selected filtering. Click a cell to focus the timing chart "
+                "on that cell."
             ),
         )
         if mapped.empty:

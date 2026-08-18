@@ -34,21 +34,35 @@ def cell_view_state(cells: pd.DataFrame, selected_cell: str | None) -> pdk.ViewS
         pitch=0,
     )
 
+def add_cell_polygon(cells: pd.DataFrame) -> pd.DataFrame:
+    cells = cells.copy()
+    half = 0.005
+
+    cells["polygon"] = cells.apply(
+        lambda row: [
+            [row["center_longitude"] - half, row["center_latitude"] - half],
+            [row["center_longitude"] + half, row["center_latitude"] - half],
+            [row["center_longitude"] + half, row["center_latitude"] + half],
+            [row["center_longitude"] - half, row["center_latitude"] + half],
+        ],
+        axis=1,
+    )
+
+    return cells
 
 def grid_cell_layer(cells: pd.DataFrame, layer_id: str) -> pdk.Layer:
-    """Build the shared selectable aggregate-cell layer."""
+    cells = add_cell_polygon(cells)
+
     return pdk.Layer(
-        "ScatterplotLayer",
+        "PolygonLayer",
         cells,
         id=layer_id,
-        get_position=["center_longitude", "center_latitude"],
-        get_radius=260,
+        get_polygon="polygon",
         get_fill_color="fill_color",
         get_line_color=colors.MAP_LINE_COLOR,
-        radius_min_pixels=5,
-        radius_max_pixels=24,
         line_width_min_pixels=1,
         stroked=True,
+        filled=True,
         pickable=True,
         auto_highlight=True,
     )
@@ -58,26 +72,40 @@ def selected_cell_layer(
     cells: pd.DataFrame,
     selected_cell: str | None,
     layer_id: str,
-    fill_alpha: int = 25,
+    fill_alpha: int = 10,
 ) -> pdk.Layer | None:
-    """Build the shared selected-cell context ring when the cell is visible."""
+
     selected = (
-        cells[cells["cell_id"].eq(selected_cell)]
+        cells[cells["cell_id"].eq(selected_cell)].copy()
         if selected_cell
-        else cells.iloc[0:0]
+        else cells.iloc[0:0].copy()
     )
+
     if selected.empty:
         return None
+
+    selected = add_cell_polygon(selected)
+
+    selected["selected_fill_color"] = selected["original_fill_color"].apply(
+        lambda c: [c[0], c[1], c[2], fill_alpha]
+    )
+
+    selected["selected_line_color"] = selected["original_fill_color"].apply(
+        lambda c: [c[0], c[1], c[2], 255]
+    )
+
     return pdk.Layer(
-        "ScatterplotLayer",
+        "PolygonLayer",
         selected,
         id=layer_id,
-        get_position=["center_longitude", "center_latitude"],
-        get_radius=520,
-        get_fill_color=colors.with_alpha(colors.SELECTED_RGB, fill_alpha),
-        get_line_color=colors.with_alpha(colors.SELECTED_RGB, 255),
+        get_polygon="polygon",
+
+        get_fill_color="selected_fill_color",
+        get_line_color="selected_line_color",
+
         line_width_min_pixels=3,
         stroked=True,
+        filled=True,
         pickable=False,
     )
 
@@ -133,5 +161,5 @@ def crash_point_layer(
         line_width_min_pixels=1,
         stroked=True,
         pickable=True,
-        auto_highlight=True,
+        auto_highlight=False,
     )

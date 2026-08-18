@@ -288,6 +288,12 @@ def build_map(
         ),
         axis=1,
     )
+    if selected_cell:
+        base_demand = demand[
+            ~demand["cell_id"].eq(selected_cell)
+        ].copy()
+    else:
+        base_demand = demand.copy()
     station_points = stations.copy()
     station_points["title"] = station_points["station_name"]
     station_points["line_1"] = station_points["address"]
@@ -314,7 +320,7 @@ def build_map(
                 pickable=False,
             )
         )
-    layers.append(grid_cell_layer(demand, "crash-cells"))
+    layers.append(grid_cell_layer(base_demand, "crash-cells"))
     if not radius_incidents.empty:
         layers.append(
             pdk.Layer(
@@ -349,7 +355,7 @@ def build_map(
             parameters={"depthTest": False},
         )
     )
-    ring = selected_cell_layer(cells, selected_cell, "selected-cell", fill_alpha=35)
+    ring = selected_cell_layer(demand, selected_cell, "selected-cell", fill_alpha=12)
     incidents = crash_point_layer(
         filtered_crashes,
         selected_cell,
@@ -532,7 +538,7 @@ def render_map_legend(cells: pd.DataFrame, selected_station: str | None) -> None
             <strong>Map legend</strong>
             <span class="mce-legend-item">
                 <span class="mce-legend-gradient" aria-hidden="true"></span>
-                Filtered crash count: color ({minimum}–{maximum}); uniform marker size
+                Filtered crash count per grid cell: color ({minimum}–{maximum})
             </span>
             <span class="mce-legend-item">
                 <span class="mce-legend-cross" aria-hidden="true">+</span>

@@ -265,36 +265,100 @@ def build_map(
     selected_cell: str | None,
     date_range: str,
 ) -> pdk.Deck:
-    """Build the selectable hotspot map."""
+
     plotted = cells.copy()
-    minimum, maximum = plotted["crash_count"].min(), plotted["crash_count"].max()
-    position = (plotted["crash_count"] - minimum) / max(maximum - minimum, 1)
+
+    minimum = plotted["crash_count"].min()
+    maximum = plotted["crash_count"].max()
+
+    position = (
+        plotted["crash_count"] - minimum
+    ) / max(maximum - minimum, 1)
+
+    # 1. COLOR
     plotted["fill_color"] = colors.map_fill_colors(position)
+    plotted["original_fill_color"] = plotted["fill_color"]
+
+    # 2. TOOLTIP FIELDS — DO THIS BEFORE MAKING base_cells
     plotted["title"] = "Grid cell " + plotted["cell_id"]
     plotted["date_range"] = date_range
-    plotted["line_1"] = plotted["crash_count"].map(lambda value: f"Crashes: {value:,}")
-    plotted["line_2"] = plotted["county_share_pct"].map(lambda value: f"County share: {value:.2f}%")
-    plotted["line_3"] = plotted["serious_or_fatal_count"].map(lambda value: f"Serious/fatal: {value:,}")
+
+    plotted["line_1"] = plotted["crash_count"].map(
+        lambda value: f"Crashes: {value:,}"
+    )
+
+    plotted["line_2"] = plotted["county_share_pct"].map(
+        lambda value: f"County share: {value:.2f}%"
+    )
+
+    plotted["line_3"] = plotted["serious_or_fatal_count"].map(
+        lambda value: f"Serious/fatal: {value:,}"
+    )
+
     plotted["line_4"] = date_range
-    plotted["line_5"] = "Roads: " + plotted["common_roads"].astype(str)
-    layers = [grid_cell_layer(plotted, "safety-cells")]
-    ring = selected_cell_layer(cells, selected_cell, "selected-safety-cell")
+
+    plotted["line_5"] = (
+        "Roads: " + plotted["common_roads"].astype(str)
+    )
+
+    # 3. NOW remove selected cell from hoverable base layer
+    if selected_cell:
+        base_cells = plotted[
+            ~plotted["cell_id"].eq(selected_cell)
+        ].copy()
+    else:
+        base_cells = plotted.copy()
+
+    # 4. BASE GRID
+    layers = [
+        grid_cell_layer(
+            base_cells,
+            "safety-cells",
+        )
+    ]
+
+    # 5. SELECTED CELL
+    ring = selected_cell_layer(
+        plotted,
+        selected_cell,
+        "selected-safety-cell",
+    )
+
+    # 6. CRASH POINTS
     incidents = crash_point_layer(
         crashes,
         selected_cell,
         "safety-crashes",
-        (("severity", "Severity"), ("weather_group", "Weather")),
+        (
+            ("severity", "Severity"),
+            ("weather_group", "Weather"),
+        ),
     )
-    layers.extend(layer for layer in (ring, incidents) if layer is not None)
+
+    layers.extend(
+        layer
+        for layer in (ring, incidents)
+        if layer is not None
+    )
+
     return pdk.Deck(
         layers=layers,
-        initial_view_state=cell_view_state(cells, selected_cell),
+        initial_view_state=cell_view_state(
+            cells,
+            selected_cell,
+        ),
         map_provider="carto",
         map_style=pdk.map_styles.CARTO_LIGHT,
         tooltip={
-            "html": "<b>{title}</b><br>{line_1}<br>{line_2}<br>{line_3}<br>{line_4}<br>{line_5}"
+            "html": (
+                "<b>{title}</b><br>"
+                "{line_1}<br>"
+                "{line_2}<br>"
+                "{line_3}<br>"
+                "{line_4}<br>"
+                "{line_5}"
+            ),
         },
-        description="Map of classified crash concentrations by grid cell",
     )
 
 

@@ -362,49 +362,64 @@ def build_map(
     )
 
 
-def build_fingerprint(fingerprint: pd.DataFrame) -> alt.VConcatChart:
-    """Build four grouped horizontal condition comparisons."""
-    charts = []
-    for family in CONDITION_FAMILIES:
-        plotted = fingerprint[fingerprint["family"].eq(family)]
-        order = (
-            plotted[plotted["geography"].eq("County average")]
-            .sort_values("category_order")["category"]
-            .tolist()
-        )
-        charts.append(
-            alt.Chart(plotted)
-            .mark_bar(cornerRadiusEnd=2)
-            .encode(
-                x=alt.X("share_pct:Q", title="Share of crashes (%)", scale=alt.Scale(zero=True)),
-                y=alt.Y("category:N", title=None, sort=order, axis=alt.Axis(labelLimit=150)),
-                yOffset=alt.YOffset("geography:N"),
-                color=alt.Color(
-                    "geography:N",
-                    title=None,
-                    scale=alt.Scale(
-                        domain=["Selected hotspot", "County average"],
-                        range=["#d95f45", "#69aaa4"],
-                    ),
-                ),
-                tooltip=[
-                    alt.Tooltip("family:N", title="Condition"),
-                    alt.Tooltip("category:N", title="Category"),
-                    alt.Tooltip("geography:N", title="Geography"),
-                    alt.Tooltip("crash_count:Q", title="Crashes"),
-                    alt.Tooltip("share_pct:Q", title="Share (%)", format=".2f"),
-                    alt.Tooltip("sample_size:Q", title="Sample size"),
-                ],
-            )
-            .properties(title=family, height=max(120, len(order) * 17))
-        )
-    return alt.vconcat(*charts, spacing=14).resolve_scale(y="independent")
+def build_condition_chart(fingerprint: pd.DataFrame, family: str) -> alt.Chart:
+    """Build one compact condition comparison for the three-column small-multiple row."""
+    plotted = fingerprint[fingerprint["family"].eq(family)]
+    order = (
+        plotted[plotted["geography"].eq("County average")]
+        .sort_values("category_order")["category"]
+        .tolist()
+    )
+    return (
+        alt.Chart(plotted)
+        .mark_bar(cornerRadiusEnd=2)
+        .encode(
+            x=alt.X(
+                "share_pct:Q",
+                title="Share of crashes (%)",
+                scale=alt.Scale(zero=True),
+                axis=alt.Axis(grid=True, tickCount=5, labelFontSize=10),
 
+            ),
+            y=alt.Y(
+                "category:N",
+                title=None,
+                sort=order,
+                axis=alt.Axis(labelLimit=180, labelFontSize=12, labelAngle=-30, labelOverlap=False),
+            ),
+            yOffset=alt.YOffset("geography:N"),
+            color=alt.Color(
+                "geography:N",
+                legend=None,
+                scale=alt.Scale(
+                    domain=["Selected hotspot", "County average"],
+                    range=["#d95f45", "#69aaa4"],
+                ),
+            ),
+            tooltip=[
+                alt.Tooltip("family:N", title="Condition"),
+                alt.Tooltip("category:N", title="Category"),
+                alt.Tooltip("geography:N", title="Geography"),
+                alt.Tooltip("crash_count:Q", title="Crashes"),
+                alt.Tooltip("share_pct:Q", title="Share (%)", format=".2f"),
+                alt.Tooltip("sample_size:Q", title="Sample size"),
+            ],
+        )
+        .properties(title=family, height=max(250, len(order) * 15))
+    )
+
+
+def build_fingerprint(fingerprint: pd.DataFrame) -> alt.HConcatChart:
+    """Backward-compatible combined condition comparison."""
+    return alt.hconcat(
+        *(build_condition_chart(fingerprint, family) for family in CONDITION_FAMILIES),
+        spacing=12,
+    ).resolve_scale(y="independent")
 
 def build_heatmap(
     timing: pd.DataFrame, selected_weekday: str | None, selected_hour: int | None
 ) -> alt.Chart:
-    """Build the linked weekday-by-hour crash-count heatmap."""
+    """Build the linked weekday-by-hour crash-count heatmap in a compact footprint."""
     time_pick = alt.selection_point(
         name="safety_time_pick",
         fields=["weekday", "hour"],
@@ -423,15 +438,33 @@ def build_heatmap(
         .encode(
             x=alt.X(
                 "hour:O",
-                title="Hour of day",
+                title=None,
                 sort=list(range(24)),
-                axis=alt.Axis(labelExpr="(datum.value < 10 ? '0' : '') + datum.value + ':00'", labelAngle=-45),
+                axis=alt.Axis(
+                    labelExpr="datum.value % 2 === 0 ? (datum.value < 10 ? '0' : '') + datum.value + ':00' : ''",
+                    labelAngle=-45,
+                    labelFontSize=9,
+                    tickSize=0,
+                ),
             ),
-            y=alt.Y("weekday:N", title=None, sort=WEEKDAYS),
+            y=alt.Y(
+                "weekday:N",
+                title=None,
+                sort=WEEKDAYS,
+                axis=alt.Axis(labelFontSize=10),
+            ),
             color=alt.Color(
                 "crash_count:Q",
                 title="Crash count",
                 scale=alt.Scale(range=colors.HEATMAP_RANGE, zero=True),
+                legend=alt.Legend(
+                    orient="top",
+                    direction="horizontal",
+                    gradientLength=120,
+                    titleAnchor="start",
+                    labelFontSize=9,
+                    titleFontSize=10,
+                ),
             ),
             stroke=alt.condition(selected, alt.value("#14202b"), alt.value("#ffffff")),
             strokeWidth=alt.condition(selected, alt.value(3), alt.value(0.5)),
@@ -445,11 +478,10 @@ def build_heatmap(
             ],
         )
         .add_params(time_pick)
-        .properties(height=300)
+        .properties(height=290)
     )
 
-
-def build_hotspot_signature_svg(signature_scores: dict) -> str:
+def build_hotspot_signature_svg(signature_scores: dict, selection_summary: dict | None = None) -> str:
     """Render the hotspot fingerprint markup as a standalone HTML/SVG component."""
     ridge_paths = {
         "Weather": [
@@ -478,9 +510,9 @@ def build_hotspot_signature_svg(signature_scores: dict) -> str:
                 * { box-sizing: border-box; }
                 body { margin: 0; font-family: system-ui, sans-serif; color: #5d6b78; }
                 .mce-fingerprint-empty { padding: 2px 0; }
-                svg { display: block; width: 100%; height: 220px; }
+                svg { display: block; width: 100%; height: 125px; }
                 .ridge { fill: #9aabb4; fill-opacity: .32; stroke: rgba(20,32,43,0.9); stroke-width: 1.3; stroke-linejoin: round; stroke-linecap: round; }
-                .copy { display: grid; gap: 3px; font-size: 13px; }
+                .copy { display: grid; gap: 2px; font-size: 12px; line-height: 1.25; }
                 .copy strong { color: #14202b; }
             </style>
             <div class="mce-fingerprint-empty" aria-label="Hotspot fingerprint empty state">
@@ -521,6 +553,19 @@ def build_hotspot_signature_svg(signature_scores: dict) -> str:
 
     overall_difference = signature_scores["overall"]
     similarity = 1.0 - overall_difference
+    if selection_summary:
+        caution_html = (
+            '<span class="sample-caution">Fewer than 30 crashes; compare percentages cautiously.</span>'
+            if selection_summary["crash_count"] < 30
+            else ""
+        )
+        selection_html = (
+            f'<div class="selection-meta"><strong>Grid cell {escape(str(selection_summary["cell_id"]))}</strong>'
+            f'<span>{selection_summary["crash_count"]:,} crashes · {selection_summary["county_share_pct"]:.2f}% of active county crashes · '
+            f'{selection_summary["serious_or_fatal_count"]:,} serious/fatal</span>{caution_html}</div>'
+        )
+    else:
+        selection_html = '<div class="selection-meta" aria-hidden="true"></div>'
 
     return f"""
         <style>
@@ -539,10 +584,13 @@ def build_hotspot_signature_svg(signature_scores: dict) -> str:
             .summary {{ display: grid; text-align: right; white-space: nowrap; }}
             .summary strong {{ font-size: 18px; }}
             .summary small {{ color: #5d6b78; font-size: 11px; font-weight: 400; }}
-            .figure {{ position: relative; margin-top: 5px; }}
+            .content {{
+                display: grid; grid-template-columns: minmax(180px, .9fr) minmax(245px, 1.1fr);
+                align-items: start; gap: 24px; margin-top: 5px;
+            }}
+            .figure {{ position: relative; }}
             svg {{
-                display: block;
-                width: 100%; height: 220px;
+                display: block; width: 100%; height: 142px;
             }}
             .ridge-group {{
                 cursor: help; outline: none;
@@ -592,11 +640,11 @@ def build_hotspot_signature_svg(signature_scores: dict) -> str:
             .card:has(.surface-target:is(:hover,:focus)) .tooltip.surface,
             .card:has(.light-target:is(:hover,:focus)) .tooltip.light {{ opacity: 1; }}
             .legend {{
-                display: grid; grid-template-columns: 1fr 1fr; gap: 7px 14px;
-                margin-top: 7px; font-size: 12px;
+                display: grid; align-content: start; gap: 7px;
+                padding-top: 8px; font-size: 11px;
             }}
             .legend-row {{ display: flex; align-items: center; gap: 7px; min-width: 0; }}
-            .line {{ width: 35px; border-top: 3px solid #a8b5a9; flex: 0 0 auto; }}
+            .line {{ width: 28px; border-top: 3px solid #a8b5a9; flex: 0 0 auto; }}
             .faint {{ opacity: .2; }} .solid {{ opacity: 1; }}
             .zone {{
                 min-width: 51px; padding: 2px 5px; border: 1px solid #9db1bb;
@@ -604,48 +652,128 @@ def build_hotspot_signature_svg(signature_scores: dict) -> str:
                 font-weight: 700; letter-spacing: .04em; text-align: center;
             }}
             .family-swatch {{
-                width: 25px; border-top: 4px solid var(--swatch-color); flex: 0 0 auto;
+                width: 22px; border-top: 4px solid var(--swatch-color); flex: 0 0 auto;
             }}
             .family-target {{ cursor: help; border-radius: 5px; outline: none; }}
             .family-target:is(:hover,:focus) {{ color: #14202b; font-weight: 600; }}
+            .selection-meta {{
+                display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-height: 27px;
+                margin-top: 4px; padding-top: 4px;
+                border-top: 1px solid rgba(100,118,116,.18); font-size: 11px; line-height: 1.2;
+            }}
+            .selection-meta strong {{ color: #14202b; font-size: 12px; }}
+            .sample-caution {{
+                margin-left: auto; padding: 2px 7px; border-radius: 999px;
+                background: #f3f3d9; color: #7a6200; font-size: 10px;
+            }}
         </style>
         <div class="card" aria-label="Hotspot fingerprint visualization">
             <div class="header">
-                <strong>Difference from county Average</strong>
+                <strong>Difference from county average</strong>
                 <span class="summary"><strong>{similarity:.1%} similar</strong><small>{overall_difference:.1%} average difference</small></span>
             </div>
-            <div class="figure">
-                <svg viewBox="0 0 256 256" role="img" aria-label="Crash fingerprint for the selected hotspot">
-                    {''.join(groups)}
-                </svg>
-                {''.join(tooltips)}
+            <div class="content">
+                <div class="figure">
+                    <svg viewBox="0 0 256 256" role="img" aria-label="Crash fingerprint for the selected hotspot">
+                        {''.join(groups)}
+                    </svg>
+                    {''.join(tooltips)}
+                </div>
+                <div class="legend" aria-label="Fingerprint legend">
+                    <div class="legend-row"><span class="line faint"></span><span>Faint fill — more different</span></div>
+                    <div class="legend-row"><span class="line solid"></span><span>Solid outline — fixed reference</span></div>
+                    <div class="legend-row family-target weather-target" tabindex="0"><span class="family-swatch" style="--swatch-color:{family_colors['Weather']}"></span><span>Weather · {1 - signature_scores['families']['Weather']['distance']:.1%} similar</span></div>
+                    <div class="legend-row family-target surface-target" tabindex="0"><span class="family-swatch" style="--swatch-color:{family_colors['Surface']}"></span><span>Surface · {1 - signature_scores['families']['Surface']['distance']:.1%} similar</span></div>
+                    <div class="legend-row family-target light-target" tabindex="0"><span class="family-swatch" style="--swatch-color:{family_colors['Light']}"></span><span>Light · {1 - signature_scores['families']['Light']['distance']:.1%} similar</span></div>
+                </div>
             </div>
-            <div class="legend" aria-label="Fingerprint legend">
-                <div class="legend-row"><span class="line faint"></span><span>Faint fill — more different</span></div>
-                <div class="legend-row family-target weather-target" tabindex="0"><span class="family-swatch" style="--swatch-color:{family_colors['Weather']}"></span><span>Weather · {1 - signature_scores['families']['Weather']['distance']:.1%} similar</span></div>
-                <div class="legend-row"><span class="line solid"></span><span>Solid outline — fixed reference</span></div>
-                <div class="legend-row family-target surface-target" tabindex="0"><span class="family-swatch" style="--swatch-color:{family_colors['Surface']}"></span><span>Surface · {1 - signature_scores['families']['Surface']['distance']:.1%} similar</span></div>
-                <div></div><div class="legend-row family-target light-target" tabindex="0"><span class="family-swatch" style="--swatch-color:{family_colors['Light']}"></span><span>Light · {1 - signature_scores['families']['Light']['distance']:.1%} similar</span></div>
-            </div>
+            {selection_html}
         </div>
     """
 
 
 def _render_map_legend(cells: pd.DataFrame) -> None:
+    """Render a thin legend strip visually attached to the map."""
     st.markdown(
         f"""
-        <section class="mce-viz-legend" aria-label="Safety hotspot map legend">
-            <strong>Map legend</strong>
-            <span class="mce-legend-item"><span class="mce-legend-gradient" aria-hidden="true"></span>Crash count: {int(cells['crash_count'].min())}–{int(cells['crash_count'].max())}; uniform marker size</span>
-            <span class="mce-legend-item"><span class="mce-legend-ring" aria-hidden="true"></span>Selected grid cell</span>
+        <section class="mce-safety-map-legend" aria-label="Safety hotspot map legend">
+            <strong>Map</strong>
+            <span class="mce-legend-item"><span class="mce-legend-gradient" aria-hidden="true"></span>Crash count {int(cells['crash_count'].min())}–{int(cells['crash_count'].max())}</span>
+            <span class="mce-legend-item"><span class="mce-legend-ring" aria-hidden="true"></span>Selected cell</span>
         </section>
         """,
         unsafe_allow_html=True,
     )
 
 
+def _render_section_title(title: str, help_text: str) -> None:
+    st.markdown(
+        f"""
+        <div class="mce-safety-section-title">
+            <h3>{escape(title)}</h3>
+            <span class="mce-safety-help" title="{escape(help_text)}" aria-label="{escape(help_text)}">?</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _render_safety_layout_css() -> None:
+    st.markdown(
+        """
+        <style>
+            .mce-view-heading { margin-bottom: .35rem; }
+            .mce-view-heading h2 { margin: 0 0 .18rem 0; }
+            .mce-view-heading p { margin: 0; }
+            .mce-safety-section-title {
+                display: flex; align-items: center; gap: 6px; margin: 0 0 2px 0; min-height: 28px;
+            }
+            .mce-safety-section-title h3 {
+                margin: 0; padding: 0; font-size: 1.18rem; line-height: 1.2; color: #14202b;
+            }
+            .mce-safety-help {
+                display: inline-grid; place-items: center; width: 16px; height: 16px;
+                border: 1px solid #8797a3; border-radius: 50%; color: #657582;
+                font-size: 10px; font-weight: 700; cursor: help;
+            }
+            .mce-safety-map-legend {
+                display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+                min-height: 28px; padding: 4px 8px; margin: 0 0 3px 0;
+                border: 1px solid rgba(100,118,116,.22); border-radius: 7px;
+                background: rgba(255,255,255,.62); color: #445460; font-size: 11px;
+            }
+            .mce-safety-map-legend strong { color: #14202b; font-size: 11px; }
+            .mce-safety-map-legend .mce-legend-item { display: inline-flex; align-items: center; gap: 5px; }
+            .mce-safety-map-legend .mce-legend-gradient {
+                width: 34px; height: 8px; border-radius: 999px;
+            }
+            .mce-safety-map-legend .mce-legend-ring {
+                width: 10px; height: 10px; border: 2px solid #14202b; border-radius: 2px;
+            }
+            .mce-safety-conditions-head {
+                display: flex; align-items: center; justify-content: space-between; gap: 12px;
+                margin: 2px 0 0 0;
+            }
+            .mce-safety-condition-legend {
+                display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+                color: #5d6b78; font-size: 11px; flex-wrap: wrap;
+            }
+            .mce-condition-key { display: inline-flex; align-items: center; gap: 5px; }
+            .mce-condition-swatch { width: 9px; height: 9px; border-radius: 1px; display: inline-block; }
+            .mce-condition-swatch.selected { background: #d95f45; }
+            .mce-condition-swatch.county { background: #69aaa4; }
+            .mce-safety-context { color: #687985; font-size: 11px; margin: 0 0 3px 0; }
+            hr.mce-safety-divider {
+                margin: .32rem 0 .38rem 0; border: 0; border-top: 1px solid rgba(100,118,116,.18);
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
 def render_safety_hotspots_view() -> None:
     """Render the connected Safety Hotspots analysis."""
+    _render_safety_layout_css()
     st.markdown(
         """
         <div class="mce-view-heading">
@@ -663,7 +791,7 @@ def render_safety_hotspots_view() -> None:
         date_key, (max(minimum_date, maximum_date - timedelta(days=365 * 5)), maximum_date)
     )
 
-    date_column, mode_column = st.columns([1.35, 1], gap="medium")
+    date_column, mode_column = st.columns([1.35, 1], gap="small")
     with date_column:
         date_range = st.date_input(
             "Safety crash date range",
@@ -688,7 +816,7 @@ def render_safety_hotspots_view() -> None:
 def render_safety_hotspots_visuals(
     filtered: pd.DataFrame, mode: str, start_date: date, end_date: date
 ) -> None:
-    """Render linked map, condition comparison, and timing views."""
+    """Render the compact linked map, fingerprint, timing, and condition workspace."""
     map_generation = st.session_state.setdefault("safety_map_generation", 0)
     heatmap_generation = st.session_state.setdefault("safety_heatmap_generation", 0)
     selected_cell = st.session_state.get("safety_selected_cell")
@@ -712,33 +840,35 @@ def render_safety_hotspots_visuals(
     fingerprint = aggregate_fingerprint(linked, selected_cell)
     selected_size = len(linked[linked["cell_id"].eq(selected_cell)]) if selected_cell else 0
 
-    summary, clear = st.columns([3.5, 1])
-    with summary:
-        time_context = f" · {selected_weekday} {selected_hour:02d}:00" if selected_weekday else ""
-        st.caption(
-            f"{len(filtered):,} {mode.lower()} · {len(mapped):,} visible cells · {geography}{time_context}"
-        )
-    with clear:
-        if st.button(
-            "Clear hotspot selection",
-            disabled=selected_cell is None and selected_weekday is None,
-            width="stretch",
-            key="safety_clear_selection",
-        ):
-            st.session_state["safety_selected_cell"] = None
-            st.session_state["safety_selected_weekday"] = None
-            st.session_state["safety_selected_hour"] = None
-            st.session_state["safety_map_generation"] = map_generation + 1
-            st.session_state["safety_heatmap_generation"] = heatmap_generation + 1
-            st.rerun()
+    time_context = f" · {selected_weekday} {selected_hour:02d}:00" if selected_weekday else ""
+    overview_context = (
+        f"{len(filtered):,} {mode.lower()} · {len(mapped):,} visible cells · {geography}{time_context}"
+    )
 
-    map_column, conditions_column = st.columns([1.25, 1], gap="medium")
+    map_column, analysis_column = st.columns([1.15, 0.95], gap="small")
+
     with map_column:
-        st.subheader(
-            "Crash hotspots by grid cell",
-            help="Each circle is a crash cell. Darker color means more crashes for the selected "
-                "filtering. Click a cell to focus the timing chart on that cell."
+        title_column, clear_column = st.columns([4.2, 1.25], gap="small", vertical_alignment="center")
+        with title_column:
+            _render_section_title(
+                "Crash hotspots by grid cell",
+                "Each grid cell summarizes crashes in roughly one square kilometre. Darker color means more crashes for the active filters. Click a cell to inspect it.",
             )
+        with clear_column:
+            if st.button(
+                "Clear selection",
+                disabled=selected_cell is None and selected_weekday is None,
+                width="stretch",
+                key="safety_clear_selection",
+            ):
+                st.session_state["safety_selected_cell"] = None
+                st.session_state["safety_selected_weekday"] = None
+                st.session_state["safety_selected_hour"] = None
+                st.session_state["safety_map_generation"] = map_generation + 1
+                st.session_state["safety_heatmap_generation"] = heatmap_generation + 1
+                st.rerun()
+
+        st.markdown(f'<div class="mce-safety-context">{escape(overview_context)}</div>', unsafe_allow_html=True)
         if mapped.empty:
             st.warning("No crashes match the selected time window.")
         else:
@@ -749,45 +879,45 @@ def render_safety_hotspots_visuals(
                 key=map_key,
                 on_select=lambda: _map_selection_callback(map_key),
                 selection_mode="single-object",
-                height=590,
+                height=505,
             )
-            if selected_cell and selected_cell in set(mapped["cell_id"]):
-                row = mapped[mapped["cell_id"].eq(selected_cell)].iloc[0]
-                route_type = summarize_route_type(filtered, selected_cell)
-                st.markdown(
-                    f"""
-                    <section class="mce-map-selection-box" aria-label="Current safety hotspot selection">
-                        <strong>Grid cell {escape(selected_cell)}</strong>
-                        <span>{row['crash_count']:,} crashes · {row['county_share_pct']:.2f}% of active county crashes</span>
-                        <span>{row['serious_or_fatal_count']:,} suspected-serious/fatal</span>
-                        <small>Route type: {escape(route_type)}</small>
-                        <small>Roads: {escape(str(row['common_roads']))}</small>
-                    </section>
-                    """,
-                    unsafe_allow_html=True,
-                )
 
-    with conditions_column:
-        st.subheader(
-            "Crash conditions",
-            help="Explore the difference between the selected hotspot (red) and the county's average (green).\n\n"
-            "The 3 charts show weather, surface condition, and lit was the area at the time of the report."
+    with analysis_column:
+        _render_section_title(
+            "Hotspot fingerprint",
+            "The fingerprint summarizes how the selected hotspot differs from the county average. More opaque zones are more similar; hover a ridge or legend item for details.",
         )
-        if selected_cell is None:
-            st.caption(f"County average n={len(linked):,} · categories sorted by county share")
-        else:
-            st.caption(
-                f"Selected hotspot n={selected_size:,} · county average n={len(linked):,} · categories sorted by county share"
-            )
-        st.altair_chart(build_fingerprint(fingerprint), width="stretch")
 
-    timing_column, signature_column = st.columns([1.25, 1], gap="medium")
-    with timing_column:
-        st.subheader(
+        selection_summary = None
+        if selected_cell and selected_cell in set(mapped["cell_id"]):
+            row = mapped[mapped["cell_id"].eq(selected_cell)].iloc[0]
+            selection_summary = {
+                "cell_id": selected_cell,
+                "crash_count": int(row["crash_count"]),
+                "county_share_pct": float(row["county_share_pct"]),
+                "serious_or_fatal_count": int(row["serious_or_fatal_count"]),
+                "route_type": summarize_route_type(filtered, selected_cell),
+                "common_roads": str(row["common_roads"]),
+            }
+
+        components.html(
+            build_hotspot_signature_svg(
+                calculate_signature_scores(fingerprint, selected_cell),
+                selection_summary,
+            ),
+            height=225,
+            scrolling=False,
+        )
+
+        st.markdown('<hr class="mce-safety-divider">', unsafe_allow_html=True)
+        _render_section_title(
             "Crash timing",
-            help="See when (day of the week and hour) occure more often"
+            "Select a weekday-hour cell to filter the map and fingerprint. Double-click the heatmap to clear the time selection.",
         )
-        st.caption("Select a weekday-hour cell to filter the map and fingerprint; double-click the heatmap to clear the time selection.")
+        st.markdown(
+            '<div class="mce-safety-context">Select a weekday-hour cell to filter the linked views; double-click to clear.</div>',
+            unsafe_allow_html=True,
+        )
         heatmap_key = f"safety_heatmap_{heatmap_generation}"
         st.altair_chart(
             build_heatmap(timing, selected_weekday, selected_hour),
@@ -796,19 +926,35 @@ def render_safety_hotspots_visuals(
             selection_mode="safety_time_pick",
             width="stretch",
         )
-    with signature_column:
-        st.subheader(
-            "Hotspot fingerprint",
-            help=("More opaque zones are more similar to the county average."
-            "\n\nFaint zones are more different. Hover any colored zone or legend item for details.")
+
+    st.markdown(
+        """
+        <div class="mce-safety-conditions-head">
+            <div class="mce-safety-section-title" style="margin:0">
+                <h3>Crash conditions</h3>
+                <span class="mce-safety-help" title="Compare the selected hotspot with the active county average for weather, road surface, and light conditions.">?</span>
+            </div>
+            <div class="mce-safety-condition-legend" aria-label="Crash conditions legend">
+                <span class="mce-condition-key"><span class="mce-condition-swatch selected"></span>Selected hotspot</span>
+                <span class="mce-condition-key"><span class="mce-condition-swatch county"></span>County average</span>
+                <span>Share of crashes (%)</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if selected_cell is None:
+        condition_context = f"County average n={len(linked):,} · categories sorted by county share"
+    else:
+        condition_context = (
+            f"Selected hotspot n={selected_size:,} · county average n={len(linked):,} · categories sorted by county share"
         )
-        components.html(
-            build_hotspot_signature_svg(calculate_signature_scores(fingerprint, selected_cell)),
-            height=350,
-            scrolling=False,
-        )
-        if selected_cell is not None and selected_size < 30:
-            st.warning("This selected hotspot has fewer than 30 crashes; compare percentages cautiously.")
+    st.markdown(f'<div class="mce-safety-context">{escape(condition_context)}</div>', unsafe_allow_html=True)
+
+    condition_columns = st.columns(3, gap="small")
+    for column, family in zip(condition_columns, CONDITION_FAMILIES):
+        with column:
+            st.altair_chart(build_condition_chart(fingerprint, family), width="stretch")
 
     st.caption(
         "All classified crashes excludes records without joinable person-level injury severity. The county fingerprint average includes the selected cell. Grid cells are 0.01° (approximately 1 km); results describe recorded crashes, not underlying exposure or causal risk."

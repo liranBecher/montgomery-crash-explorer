@@ -139,6 +139,24 @@ class SafetyHotspotsUiTest(unittest.TestCase):
         self.assertIn("Weather", selected_svg)
         self.assertIn("mce-fingerprint-ridge", selected_svg)
 
+        summary = {
+            "cell_id": "39.00:-77.10",
+            "crash_count": 2,
+            "county_share_pct": 50.0,
+            "serious_or_fatal_count": 1,
+        }
+        selected_svg = build_hotspot_signature_svg(
+            calculate_signature_scores(fingerprint), summary
+        )
+        self.assertIn('class="content"', selected_svg)
+        self.assertIn("Fewer than 30 crashes", selected_svg)
+
+        summary["crash_count"] = 30
+        selected_svg = build_hotspot_signature_svg(
+            calculate_signature_scores(fingerprint), summary
+        )
+        self.assertNotIn("Fewer than 30 crashes", selected_svg)
+
     def test_map_selection_remounts_map_for_semantic_zoom(self) -> None:
         state = {
             "map": {

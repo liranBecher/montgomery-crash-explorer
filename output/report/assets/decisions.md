@@ -138,7 +138,7 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
 ### Scope and data meaning
 
 - The tab is named **Fire & Rescue Proximity**.
-- It uses mapped fire-station locations to examine **straight-line proximity**
+- It uses mapped fire-station locations to examine **road-network proximity**
   to crash demand. It does not claim response times, dispatch coverage,
   staffing, service areas, or operational performance.
 - The mapped station layer contains 37 usable stations. Station 27 / Public
@@ -146,7 +146,17 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
 - The analysis is based on 0.01-degree geographic cells for the countywide
   overview, with exact crash locations revealed only during semantic
   drill-down.
-- Distances use the Haversine straight-line calculation in kilometres.
+- The main distance measure is shortest drivable OpenStreetMap distance in
+  kilometres. Haversine straight-line distance remains secondary context and
+  powers the station-radius comparison and map circle.
+- Road distances use a cached, directed OpenStreetMap `drive_service` graph.
+  Crashes and stations are snapped to its largest strongly connected component,
+  point-to-node connector distances are included, and shortest paths respect
+  one-way directionality.
+- The processed crash table stores the road-nearest station, road distance, and
+  crash-to-network snap distance. All 122,367 crashes route successfully; the
+  maximum station snap is 71.3 metres and the maximum crash snap is 929.1
+  metres. Snap distance is retained so this approximation remains auditable.
 
 ### Severity and filtering
 
@@ -185,13 +195,17 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
 
 ### Companion views
 
-- The scatterplot compares the median exact crash-to-nearest-station
-  straight-line distance within each grid cell (x) with filtered crash count
-  (y). It intentionally avoids an arbitrary composite "gap score."
+- The scatterplot compares median crash-to-nearest-station road distance within
+  each grid cell (x) with filtered crash count (y), with median straight-line
+  distance in the tooltip. It intentionally avoids an arbitrary composite "gap
+  score."
 - The station bar chart ranks stations by the number of filtered crashes inside
   the selected radius. It supports **Most active** and **Least active** views.
 - Each station is counted independently in the bar chart, so a crash can occur
   in more than one station radius; this is disclosed in the chart caption.
+- The NFPA 1710 four-minute first-engine benchmark is presented only as context
+  for why fire-service standards are expressed in time. Neither road distance
+  nor straight-line distance is converted into or presented as response time.
 
 ### Interaction decisions
 
@@ -206,6 +220,10 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
   selections.
 - Only the linked visualization block rerenders on map, scatterplot, or bar
   selection; the tab header and filter controls remain in place.
+- The cached Fire & Rescue loader carries an explicit data-schema version and
+  validates the road-distance field. This prevents a running Streamlit process
+  from reusing a pre-road-distance cached DataFrame after the Parquet schema is
+  upgraded.
 
 ### Analytical cautions
 

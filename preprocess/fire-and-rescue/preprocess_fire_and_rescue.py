@@ -14,6 +14,7 @@ INCIDENTS_FILE = RAW_DIR / "Crash_Reporting_-_Incidents_Data.csv"
 DRIVERS_FILE = RAW_DIR / "Crash_Reporting_-_Drivers_Data.csv"
 NON_MOTORISTS_FILE = RAW_DIR / "Crash_Reporting_-_Non-Motorists_Data.csv"
 STATIONS_FILE = RAW_DIR / "Fire_Station.csv"
+ROAD_GRAPH_FILE = RAW_DIR / "montgomery_drive_service.graphml"
 
 CRASHES_OUTPUT = OUTPUT_DIR / "fire_rescue_crashes.parquet"
 CELLS_OUTPUT = OUTPUT_DIR / "fire_rescue_cells.parquet"
@@ -23,6 +24,7 @@ GRID_SIZE_DEGREES = 0.01
 EARTH_RADIUS_KM = 6371.0088
 LATITUDE_BOUNDS = (38.8, 39.4)
 LONGITUDE_BOUNDS = (-77.6, -76.8)
+ROAD_GRAPH_BUFFER_DEGREES = 0.03
 
 SEVERITY_RANK = {
     "NO APPARENT INJURY": 0,
@@ -137,7 +139,149 @@ def nearest_stations(cells: pd.DataFrame, stations: pd.DataFrame) -> pd.DataFram
     return result
 
 
-def load_and_transform() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict[str, int]]:
+def road_proximity_from_nodes(
+    graph: object,
+    crash_nodes: np.ndarray,
+    crash_snap_m: np.ndarray,
+    station_nodes: np.ndarray,
+    station_snap_m: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return directed road distances and nearest-station row positions."""
+    import networkx as nx
+
+    reverse_graph = graph.reverse(copy=True)
+    super_source = object()
+    station_position_by_node: dict[object, int] = {}
+    for position, (node, snap_m) in enumerate(zip(station_nodes, station_snap_m)):
+        previous = station_position_by_node.get(node)
+        if previous is None or snap_m < station_snap_m[previous]:
+            station_position_by_node[node] = position
+    reverse_graph.add_node(super_source)
+    for node, position in station_position_by_node.items():
+        reverse_graph.add_edge(
+            super_source, node, length=float(station_snap_m[position])
+        )
+
+    predecessors, network_m = nx.dijkstra_predecessor_and_distance(
+        reverse_graph, super_source, weight="length"
+    )
+    source_cache: dict[object, int] = {}
+
+    def station_position(node: object) -> int:
+        trail = []
+        cursor = node
+        while cursor not in source_cache:
+            previous = predecessors.get(cursor)
+            if not previous:
+                raise ValueError(f"Road node {cursor!r} cannot reach a mapped station")
+            if previous[0] == super_source:
+                source_cache[cursor] = station_position_by_node[cursor]
+                break
+            trail.append(cursor)
+            cursor = previous[0]
+        position = source_cache[cursor]
+        source_cache.update(dict.fromkeys(trail, position))
+        return position
+
+    unique_nodes, inverse = np.unique(crash_nodes, return_inverse=True)
+    unique_station_positions = np.array(
+        [station_position(node) for node in unique_nodes], dtype=int
+    )
+    network_distances_m = np.array(
+        [network_m[node] for node in crash_nodes], dtype=float
+    )
+    return (
+        (network_distances_m + crash_snap_m) / 1000,
+        unique_station_positions[inverse],
+    )
+
+
+def add_road_proximity(
+    crashes: pd.DataFrame, stations: pd.DataFrame
+) -> tuple[pd.DataFrame, dict[str, int | float]]:
+    """Attach shortest drivable distance to the nearest mapped station."""
+    import geopandas as gpd
+    import osmnx as ox
+
+    if ROAD_GRAPH_FILE.exists():
+        graph = ox.load_graphml(ROAD_GRAPH_FILE)
+    else:
+        coordinates = pd.concat(
+            [
+                crashes[["longitude", "latitude"]],
+                stations[["station_longitude", "station_latitude"]].rename(
+                    columns={
+                        "station_longitude": "longitude",
+                        "station_latitude": "latitude",
+                    }
+                ),
+            ],
+            ignore_index=True,
+        )
+        bbox = (
+            float(coordinates["longitude"].min() - ROAD_GRAPH_BUFFER_DEGREES),
+            float(coordinates["latitude"].min() - ROAD_GRAPH_BUFFER_DEGREES),
+            float(coordinates["longitude"].max() + ROAD_GRAPH_BUFFER_DEGREES),
+            float(coordinates["latitude"].max() + ROAD_GRAPH_BUFFER_DEGREES),
+        )
+        ox.settings.use_cache = True
+        ox.settings.cache_folder = RAW_DIR / "osmnx-cache"
+        ox.settings.requests_timeout = 300
+        graph = ox.graph.graph_from_bbox(
+            bbox,
+            network_type="drive_service",
+            simplify=True,
+            retain_all=False,
+            truncate_by_edge=True,
+        )
+        ox.save_graphml(graph, ROAD_GRAPH_FILE)
+
+    graph = ox.truncate.largest_component(graph, strongly=True)
+    projected = ox.projection.project_graph(graph)
+    graph_crs = projected.graph["crs"]
+
+    def projected_xy(frame: pd.DataFrame, longitude: str, latitude: str):
+        points = gpd.GeoSeries(
+            gpd.points_from_xy(frame[longitude], frame[latitude]), crs="EPSG:4326"
+        ).to_crs(graph_crs)
+        return points.x.to_numpy(), points.y.to_numpy()
+
+    crash_x, crash_y = projected_xy(crashes, "longitude", "latitude")
+    station_x, station_y = projected_xy(
+        stations, "station_longitude", "station_latitude"
+    )
+    crash_nodes, crash_snap_m = ox.distance.nearest_nodes(
+        projected, crash_x, crash_y, return_dist=True
+    )
+    station_nodes, station_snap_m = ox.distance.nearest_nodes(
+        projected, station_x, station_y, return_dist=True
+    )
+    road_distance_km, station_positions = road_proximity_from_nodes(
+        projected,
+        np.asarray(crash_nodes),
+        np.asarray(crash_snap_m),
+        np.asarray(station_nodes),
+        np.asarray(station_snap_m),
+    )
+
+    result = crashes.copy()
+    nearest = stations.iloc[station_positions]
+    result["nearest_road_station_id"] = nearest["station_id"].to_numpy()
+    result["nearest_road_station_name"] = nearest["station_name"].to_numpy()
+    result["nearest_road_station_distance_km"] = road_distance_km.round(3)
+    result["road_snap_distance_m"] = np.asarray(crash_snap_m).round(1)
+    quality = {
+        "road_graph_nodes": len(projected.nodes),
+        "road_graph_edges": len(projected.edges),
+        "maximum_crash_road_snap_m": float(np.max(crash_snap_m)),
+        "maximum_station_road_snap_m": float(np.max(station_snap_m)),
+    }
+    return result, quality
+
+
+def load_and_transform() -> tuple[
+    pd.DataFrame, pd.DataFrame, pd.DataFrame, dict[str, int | float]
+]:
     """Load the raw snapshot and return validated crash, cell, and station tables."""
     incidents = pd.read_csv(
         INCIDENTS_FILE,
@@ -241,6 +385,8 @@ def load_and_transform() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict
         ]
     ].sort_values("station_id", ignore_index=True)
 
+    crashes, road_quality = add_road_proximity(crashes, stations)
+
     cells = pd.DataFrame(
         {
             "cell_id": crashes["cell_id"].drop_duplicates().sort_values().to_numpy(),
@@ -260,6 +406,7 @@ def load_and_transform() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict
         "raw_stations": len(raw_stations),
         "excluded_station_coordinates": excluded_stations,
         "processed_stations": len(stations),
+        **road_quality,
     }
     return crashes, cells, stations, quality
 
@@ -277,11 +424,28 @@ def validate_outputs(
         "latitude",
         "longitude",
         "cell_id",
+        "nearest_road_station_id",
+        "nearest_road_station_name",
+        "nearest_road_station_distance_km",
+        "road_snap_distance_m",
     ]
     if crashes[required_crash_fields].isna().any().any():
         raise ValueError("Processed crashes contain missing required values")
     if cells["cell_id"].duplicated().any():
         raise ValueError("Processed cells must be unique")
+    if not set(crashes["nearest_road_station_id"]).issubset(
+        set(stations["station_id"])
+    ):
+        raise ValueError("A crash references an unknown road-nearest station")
+    road_distances = crashes["nearest_road_station_distance_km"]
+    if (
+        road_distances.isna().any()
+        or not np.isfinite(road_distances).all()
+        or (road_distances < 0).any()
+    ):
+        raise ValueError("Crash road distances must be finite and non-negative")
+    if (crashes["road_snap_distance_m"] > 1000).any():
+        raise ValueError("A crash is more than 1 km from the drive network")
     if not set(cells["nearest_station_id"]).issubset(set(stations["station_id"])):
         raise ValueError("A cell references an unknown station")
     distances = cells["nearest_station_distance_km"]

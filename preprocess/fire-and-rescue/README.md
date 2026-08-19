@@ -12,10 +12,12 @@ Rescue Proximity tab. Its deployment-ready tables are written to
 | Drivers | Driver injury severity by crash | 218,689 |
 | Non-motorists | Pedestrian, cyclist, and other non-motorist injury severity | 7,459 |
 | Fire stations | Mapped Montgomery County fire-station locations | 38 |
+| OpenStreetMap | Directed drivable road network | Cached GraphML extraction |
 
 Run the pipeline from the repository root:
 
 ```powershell
+python -m pip install -r preprocess/fire-and-rescue/requirements.txt
 python preprocess/fire-and-rescue/preprocess_fire_and_rescue.py
 ```
 
@@ -33,8 +35,13 @@ python preprocess/fire-and-rescue/preprocess_fire_and_rescue.py
    bounding box.
 7. Assign crashes to fixed `0.01°` cells (approximately 0.9 × 1.1 km near
    Montgomery County).
-8. Calculate the Haversine distance from each cell center to its nearest mapped
-   station.
+8. Download and cache the OpenStreetMap `drive_service` network covering the
+   validated coordinates, then retain its largest strongly connected component.
+9. Snap crashes and stations to projected road nodes and calculate directed
+   shortest drivable distance to the nearest station. Point-to-node connector
+   distances are included.
+10. Calculate the Haversine distance from each cell center to its nearest mapped
+    station for secondary straight-line context.
 
 The current snapshot produces 122,367 classified crashes with valid coordinates,
 1,262 occupied cells, and 37 usable stations. Of those crashes, 2,819 are
@@ -47,8 +54,9 @@ All outputs are stored together under `data/processed/fire-and-rescue/`.
 
 ### `fire_rescue_crashes.parquet`
 
-One row per classified crash: report number, timestamp and derived time
-fields, severity, coordinates, road name, and cell ID.
+One row per classified crash: report number, timestamp and derived time fields,
+severity, coordinates, road name, cell ID, nearest road-network station,
+shortest drivable distance, and road-snap distance.
 
 ### `fire_rescue_cells.parquet`
 
@@ -62,9 +70,11 @@ city, latitude, and longitude.
 
 ## Limitations
 
-The cell table's distance is straight-line proximity from a grid-cell center;
-the interactive scatterplot instead calculates exact crash-level Haversine
-distances and shows their median within each cell. Neither measure is road
-travel time, dispatch history, a service area, or evidence about staffing,
-availability, or actual response performance. The 2026 data ends on August 5
-and is incomplete for annual comparisons.
+Road distance reflects the shortest path through the cached OpenStreetMap drive
+network, not live traffic, apparatus restrictions, dispatch decisions, or travel
+time. Crash and station coordinates are connected to their nearest strongly
+connected road node; `road_snap_distance_m` exposes that approximation for QA.
+The station-radius chart and circle remain Haversine straight-line measures.
+None of these measures is evidence about staffing, availability, or actual
+response performance. The 2026 data ends on August 5 and is incomplete for
+annual comparisons.

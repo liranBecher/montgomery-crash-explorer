@@ -76,8 +76,9 @@ selection will restore the countywide overview.
   available; suspected-serious and fatal are selected by default. Minor and
   no-apparent-injury records remain in processed data but are not UI options.
 - Linked detail view: occupied grid cells plotted by crash count and the median
-  crash-level Haversine distance to the nearest mapped station. Grid-cell
-  circles use a uniform size so position remains the only quantitative encoding.
+  crash-level shortest drivable distance to the nearest mapped station. Exact
+  Haversine distance remains available as secondary context. Grid-cell circles
+  use a uniform size so position remains the only quantitative encoding.
 - Station comparison: a ranked horizontal bar chart counts filtered crashes
   inside an adjustable straight-line radius around each
   mapped station, with controls for the most-active or least-active end of the
@@ -86,8 +87,9 @@ selection will restore the countywide overview.
   moving later charts. Clicking a station bar focuses the map; hovering only
   shows the chart tooltip and does not rerun the page. Empty-map clicks clear
   selection.
-- The view describes straight-line proximity only. It does not represent road
-  travel time, dispatch history, service areas, staffing, or response performance.
+- The view describes road-network and straight-line geographic proximity. It
+  does not represent travel time, dispatch history, service areas, staffing, or
+  response performance.
 
 ### 3. Police Breathalyzers
 

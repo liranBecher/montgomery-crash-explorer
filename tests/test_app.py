@@ -137,17 +137,18 @@ class LayoutPrototypeTest(unittest.TestCase):
                 "nearest_station_name": ["A"],
                 "nearest_station_distance_km": [0.0],
                 "median_crash_station_distance_km": [0.0],
+                "median_crash_road_distance_km": [0.1],
             }
         )
         deck = build_map(cells, stations, crashes, None, None, 1.5, False)
         self.assertEqual(deck.layers[0].id, "crash-cells")
         self.assertEqual(
             deck.layers[0].data[0]["line_3"],
-            "Median crash distance to nearest station: 0.00 km",
+            "Median road distance: 0.10 km (straight-line: 0.00 km)",
         )
         self.assertEqual(deck.initial_view_state.zoom, 8.6)
 
-    def test_scatter_proximity_uses_exact_crash_locations(self) -> None:
+    def test_scatter_proximity_uses_precomputed_road_distance(self) -> None:
         crashes = pd.DataFrame(
             {
                 "report_number": ["A", "B"],
@@ -157,6 +158,7 @@ class LayoutPrototypeTest(unittest.TestCase):
                 "longitude": [0.0, 0.0],
                 "road_name": ["A ROAD", "A ROAD"],
                 "severity": ["Fatal Injury", "Suspected Serious Injury"],
+                "nearest_road_station_distance_km": [0.1, 3.0],
             }
         )
         cells = pd.DataFrame(
@@ -182,9 +184,12 @@ class LayoutPrototypeTest(unittest.TestCase):
         self.assertAlmostEqual(
             result.loc[0, "median_crash_station_distance_km"], 1.112, places=3
         )
+        self.assertAlmostEqual(
+            result.loc[0, "median_crash_road_distance_km"], 1.55, places=3
+        )
         self.assertEqual(
             build_gap_scatter(result, None).to_dict()["layer"][0]["encoding"]["x"]["field"],
-            "median_crash_station_distance_km",
+            "median_crash_road_distance_km",
         )
 
     def test_fire_map_semantic_zoom_preserves_station_zoom_priority(self) -> None:
@@ -198,6 +203,7 @@ class LayoutPrototypeTest(unittest.TestCase):
                 "nearest_station_name": ["A"],
                 "nearest_station_distance_km": [0.2],
                 "median_crash_station_distance_km": [0.3],
+                "median_crash_road_distance_km": [0.5],
             }
         )
         crashes = pd.DataFrame(

@@ -23,6 +23,7 @@ DATA_DIR = Path(__file__).resolve().parents[1] / "data" / "processed" / "fire-an
 CRASHES_FILE = DATA_DIR / "fire_rescue_crashes.parquet"
 CELLS_FILE = DATA_DIR / "fire_rescue_cells.parquet"
 STATIONS_FILE = DATA_DIR / "fire_stations.parquet"
+FIRE_RESCUE_DATA_SCHEMA_VERSION = 2
 
 DAYPARTS = ["All day", "Overnight", "Morning", "Afternoon", "Evening"]
 SEVERITIES = [
@@ -75,13 +76,18 @@ def _bound_date_range_state(
 
 
 @st.cache_data
-def load_fire_rescue_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def load_fire_rescue_data(
+    schema_version: int = FIRE_RESCUE_DATA_SCHEMA_VERSION,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Load the committed deployment datasets."""
-    return (
-        pd.read_parquet(CRASHES_FILE),
-        pd.read_parquet(CELLS_FILE),
-        pd.read_parquet(STATIONS_FILE),
-    )
+    crashes = pd.read_parquet(CRASHES_FILE)
+    required = {"nearest_road_station_distance_km"}
+    if missing := required.difference(crashes.columns):
+        raise RuntimeError(
+            f"Fire & Rescue data schema {schema_version} is missing {sorted(missing)}. "
+            "Run preprocess/fire-and-rescue/preprocess_fire_and_rescue.py."
+        )
+    return crashes, pd.read_parquet(CELLS_FILE), pd.read_parquet(STATIONS_FILE)
 
 
 def aggregate_cells(
@@ -98,6 +104,7 @@ def aggregate_cells(
             last_crash=pd.Series(dtype="datetime64[ns]"),
             common_roads=pd.Series(dtype="string"),
             median_crash_station_distance_km=pd.Series(dtype="float64"),
+            median_crash_road_distance_km=pd.Series(dtype="float64"),
         )
 
     working = filtered.assign(
@@ -114,6 +121,7 @@ def aggregate_cells(
         first_crash=("crash_datetime", "min"),
         last_crash=("crash_datetime", "max"),
         median_crash_station_distance_km=("crash_station_distance_km", "median"),
+        median_crash_road_distance_km=("nearest_road_station_distance_km", "median"),
     )
     severity_counts = (
         working.groupby(["cell_id", "severity"], as_index=False)
@@ -292,8 +300,8 @@ def build_map(
     demand["line_2"] = demand["severity_breakdown"]
     demand["line_3"] = demand.apply(
         lambda row: (
-            "Median crash distance to nearest station: "
-            f"{row['median_crash_station_distance_km']:.2f} km"
+            f"Median road distance: {row['median_crash_road_distance_km']:.2f} km "
+            f"(straight-line: {row['median_crash_station_distance_km']:.2f} km)"
         ),
         axis=1,
     )
@@ -425,8 +433,8 @@ def build_gap_scatter(cells: pd.DataFrame, selected_cell: str | None) -> alt.Cha
         .mark_circle(size=55, stroke="white", strokeWidth=0.8)
         .encode(
             x=alt.X(
-                "median_crash_station_distance_km:Q",
-                title="Median crash-to-nearest-station distance (km)",
+                "median_crash_road_distance_km:Q",
+                title="Median road distance to nearest station (km)",
                 scale=alt.Scale(zero=True),
             ),
             y=alt.Y(
@@ -447,8 +455,13 @@ def build_gap_scatter(cells: pd.DataFrame, selected_cell: str | None) -> alt.Cha
             tooltip=[
                 alt.Tooltip("cell_id:N", title="Grid cell"),
                 alt.Tooltip(
+                    "median_crash_road_distance_km:Q",
+                    title="Median road distance (km)",
+                    format=".2f",
+                ),
+                alt.Tooltip(
                     "median_crash_station_distance_km:Q",
-                    title="Median crash distance (km)",
+                    title="Median straight-line distance (km)",
                     format=".2f",
                 ),
                 alt.Tooltip("crash_count:Q", title="Filtered crashes"),
@@ -462,7 +475,7 @@ def build_gap_scatter(cells: pd.DataFrame, selected_cell: str | None) -> alt.Cha
     )
     medians = pd.DataFrame(
         {
-            "distance": [cells["median_crash_station_distance_km"].median()],
+            "distance": [cells["median_crash_road_distance_km"].median()],
             "count": [cells["crash_count"].median()],
         }
     )
@@ -538,7 +551,7 @@ def render_map_legend(cells: pd.DataFrame, selected_station: str | None) -> None
         """
         <span class="mce-legend-item">
             <span class="mce-legend-radius" aria-hidden="true"></span>
-            Selected station radius and included incidents
+            Selected station straight-line radius and included incidents
         </span>
         """
         if selected_station
@@ -562,7 +575,7 @@ def render_map_legend(cells: pd.DataFrame, selected_station: str | None) -> None
                 Selected grid cell
             </span>
             <span class="mce-legend-item">
-                Cell details: median exact crash-to-nearest-station distance
+                Cell details: median road distance; straight-line distance for context
             </span>
             {station_context}
         </section>
@@ -579,7 +592,7 @@ def render_scatter_legend() -> None:
             <strong>Scatterplot legend</strong>
             <span class="mce-legend-item">
                 <span class="mce-legend-dot mce-legend-cell" aria-hidden="true"></span>
-                Grid cell (x: median of exact crash distances)
+                Grid cell (x: median road distance)
             </span>
             <span class="mce-legend-item">
                 <span class="mce-legend-dot mce-legend-selected" aria-hidden="true"></span>
@@ -611,8 +624,8 @@ def render_map_selection_box(
         title = f"Grid cell {row['cell_id']}"
         primary = f"{row['crash_count']:,} filtered crashes · {row['severity_breakdown']}"
         secondary = (
-            "Median crash distance to nearest mapped station · "
-            f"{row['median_crash_station_distance_km']:.2f} km straight-line"
+            f"Median road distance · {row['median_crash_road_distance_km']:.2f} km · "
+            f"Straight-line · {row['median_crash_station_distance_km']:.2f} km"
         )
         detail = (
             f"{row['first_crash']:%b %d, %Y}–{row['last_crash']:%b %d, %Y} · "
@@ -648,7 +661,7 @@ def render_fire_rescue_view(shared_filters: SharedFilters) -> None:
         """
         <div class="mce-view-heading">
             <h2>Where are crashes farther from mapped fire stations?</h2>
-            <p>Filter by maximum recorded injury severity and compare crash demand with straight-line station proximity. This is not a response-time measure.</p>
+            <p>Filter by maximum recorded injury severity and compare crash demand with shortest drivable distance to a mapped station. This is not a response-time measure.</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -749,8 +762,9 @@ def render_fire_rescue_visuals(
                 st.rerun()
         st.caption(
             f"{len(filtered):,} filtered crashes · {len(visible_cells):,} visible cells · "
-            f"{len(stations)} mapped stations · cell distances are medians of exact "
-            "crash-level Haversine distances"
+            f"{len(stations)} mapped stations · cell distances are medians of "
+            "crash-level shortest-road distances · Road network: "
+            "[© OpenStreetMap contributors](https://www.openstreetmap.org/copyright)"
         )
         render_map_legend(visible_cells, selected_station)
         map_key = f"fire_rescue_map_{map_generation}"
@@ -782,7 +796,7 @@ def render_fire_rescue_visuals(
             "Demand versus station proximity",
             help=(
                 "Cells toward the upper-right combine more crashes with a greater "
-                "median exact crash-to-nearest-station distance."
+                "median road distance to the nearest mapped station."
             ),
         )
         render_scatter_legend()
@@ -795,8 +809,8 @@ def render_fire_rescue_visuals(
         )
         st.caption(
             "Context: NFPA 1710 uses a 4-minute first-engine travel-time "
-            "benchmark. Distance here is shown only as straight-line geographic "
-            "proximity and should not be converted directly to response time."
+            "benchmark. Road and straight-line distances here are geographic "
+            "proximity measures and should not be converted directly to response time."
         )
 
     st.subheader(
@@ -830,7 +844,8 @@ def render_fire_rescue_visuals(
     station_counts = aggregate_station_radius(filtered, stations, radius_km)
     rank_label = "Top" if activity_mode == "Most active" else "Bottom"
     st.caption(
-        f"{rank_label} {station_limit} mapped stations within {radius_km:g} km. Each station is counted "
+        f"{rank_label} {station_limit} mapped stations within a {radius_km:g} km "
+        "straight-line radius. Each station is counted "
         "independently, so crashes can appear in more than one bar where radii overlap. "
         "This is proximity, not workload or response coverage."
     )

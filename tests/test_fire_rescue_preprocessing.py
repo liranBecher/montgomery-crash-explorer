@@ -2,6 +2,8 @@ from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 import unittest
 
+import networkx as nx
+import numpy as np
 import pandas as pd
 
 
@@ -75,6 +77,28 @@ class FireRescuePreprocessingTest(unittest.TestCase):
         self.assertEqual(result.loc[0, "nearest_station_id"], "near")
         self.assertAlmostEqual(result.loc[0, "nearest_station_distance_km"], 1.112, places=3)
 
+    def test_road_proximity_respects_direction_and_station_access(self) -> None:
+        graph = nx.DiGraph()
+        graph.add_weighted_edges_from(
+            [("crash-a", "station-a", 10), ("crash-a", "station-b", 5)],
+            weight="length",
+        )
+        graph.add_weighted_edges_from(
+            [("crash-b", "station-a", 100), ("crash-b", "station-b", 2)],
+            weight="length",
+        )
+
+        distances, station_positions = preprocessing.road_proximity_from_nodes(
+            graph,
+            np.array(["crash-a", "crash-b"]),
+            np.array([1.0, 1.0]),
+            np.array(["station-a", "station-b"]),
+            np.array([0.0, 20.0]),
+        )
+
+        np.testing.assert_allclose(distances, [0.011, 0.023])
+        self.assertEqual(station_positions.tolist(), [0, 1])
+
     def test_committed_parquet_contract(self) -> None:
         output_dir = PROJECT_ROOT / "data" / "processed" / "fire-and-rescue"
         crashes = pd.read_parquet(output_dir / "fire_rescue_crashes.parquet")
@@ -84,6 +108,14 @@ class FireRescuePreprocessingTest(unittest.TestCase):
         self.assertEqual(len(crashes), 122367)
         self.assertEqual(len(cells), 1262)
         self.assertEqual(len(stations), 37)
+        self.assertTrue(
+            {
+                "nearest_road_station_id",
+                "nearest_road_station_name",
+                "nearest_road_station_distance_km",
+                "road_snap_distance_m",
+            }.issubset(crashes.columns)
+        )
         self.assertEqual(
             crashes["severity"].value_counts().to_dict(),
             {

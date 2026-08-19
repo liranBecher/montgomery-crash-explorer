@@ -118,6 +118,7 @@ it.
 - [Drivers](https://data.montgomerycountymd.gov/Public-Safety/Crash-Reporting-Drivers-Data/mmzv-x632)
 - [Non-motorists](https://data.montgomerycountymd.gov/Public-Safety/Crash-Reporting-Non-Motorists-Data/n7fk-dce5)
 - [Fire stations](https://data.montgomerycountymd.gov/Public-Safety/Fire-Station/4cam-wimd/about_data)
+- [OpenStreetMap road network](https://www.openstreetmap.org/copyright)
 
 ## Deployment
 
@@ -126,8 +127,10 @@ Python 3.12 and keep the app public for course submission.
 
 ## Current limitations
 
-- Fire-station proximity is straight-line distance, not travel time or measured
-  emergency response performance.
+- Fire-station proximity uses shortest drivable OpenStreetMap distance for the
+  map and scatterplot, with straight-line distance retained as context and for
+  station-radius circles. Neither measure is travel time or measured emergency
+  response performance.
 - The alcohol view describes historical recorded patterns; it does not measure
   blood alcohol level or establish where enforcement should occur.
 - Accessibility, browser compatibility, performance, and user comprehension

@@ -9,7 +9,6 @@ from ui.views import (
     render_alcohol_enforcement_view,
     render_responder_view,
     render_safety_view,
-    render_vehicle_view,
 )
 
 
@@ -23,12 +22,11 @@ load_styles()
 render_app_header()
 render_sidebar()
 
-safety, responders, breathalyzers, vehicles = st.tabs(
+safety, responders, breathalyzers = st.tabs(
     [
         "Safety Hotspots",
         "Fire & Rescue Proximity",
         "Police Breathalyzers",
-        "Vehicles & Injuries",
     ]
 )
 
@@ -40,6 +38,3 @@ with responders:
 
 with breathalyzers:
     render_alcohol_enforcement_view()
-
-with vehicles:
-    render_vehicle_view()

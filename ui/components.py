@@ -21,13 +21,9 @@ def render_app_header() -> None:
                 <h1>Crash Explorer</h1>
                 <h5>An assistance system for exploring crash data in the Montgomery County area</h5>
                 <p class="mce-subtitle">
-                    Explore crash patterns, response coverage, alcohol enforcement,
-                    and vehicle-related injury severity.
+                    Explore crash patterns, response coverage and alcohol enforcement.
                 </p>
             </div>
-            <span class="mce-status" role="status">
-                Safety, Fire &amp; Rescue, and alcohol analyses connected
-            </span>
         </header>
         """,
         unsafe_allow_html=True,
@@ -76,32 +72,3 @@ def render_view_header(title: str, description: str, control_label: str, key: st
             disabled=True,
             key=key,
         )
-
-
-def render_placeholder_card(
-    title: str,
-    description: str,
-    *,
-    height: int,
-    interaction_note: str,
-) -> None:
-    st.markdown(
-        f"""
-        <section class="mce-card" aria-label="{escape(title)}" style="min-height: {height}px">
-            <div class="mce-card-heading">
-                <h3>{escape(title)}</h3>
-                <span class="mce-card-badge">Planned view</span>
-            </div>
-            <p>{escape(description)}</p>
-            <div class="mce-empty-state" role="status">
-                <span class="mce-empty-icon" aria-hidden="true"></span>
-                <strong>No visualization is rendered</strong>
-                <small>Connect validated processed data to activate this planned view.</small>
-            </div>
-            <p class="mce-interaction-note">
-                <strong>Planned interaction:</strong> {escape(interaction_note)}
-            </p>
-        </section>
-        """,
-        unsafe_allow_html=True,
-    )

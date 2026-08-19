@@ -14,12 +14,31 @@ from ui.fire_rescue import (
     build_map,
     build_station_radius_bar,
 )
+from ui.components import SharedFilters, apply_shared_filters
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class LayoutPrototypeTest(unittest.TestCase):
+    def test_shared_filters_apply_dates_and_area_report_numbers(self) -> None:
+        crashes = pd.DataFrame(
+            {
+                "report_number": ["A", "B", "C"],
+                "crash_datetime": pd.to_datetime(
+                    ["2025-01-01", "2025-06-01", "2026-01-01"]
+                ),
+            }
+        )
+        filters = SharedFilters(
+            date(2025, 1, 1), date(2025, 12, 31), "Rockville", frozenset({"B", "C"})
+        )
+
+        self.assertEqual(
+            apply_shared_filters(crashes, filters)["report_number"].tolist(),
+            ["B"],
+        )
+
     def test_date_presets_shift_to_the_last_available_date(self) -> None:
         self.assertEqual(
             _bound_date_range(
@@ -166,7 +185,11 @@ class LayoutPrototypeTest(unittest.TestCase):
         self.assertAlmostEqual(station_deck.initial_view_state.latitude, 39.2)
 
     def test_app_renders_connected_fire_rescue_view(self) -> None:
-        app = AppTest.from_file(str(PROJECT_ROOT / "app.py")).run(timeout=15)
+        app = AppTest.from_file(str(PROJECT_ROOT / "app.py"))
+        app.session_state["filter_start_date"] = None
+        app.session_state["filter_end_date"] = None
+        app.session_state["filter_area"] = None
+        app.run(timeout=15)
 
         self.assertFalse(app.exception)
         self.assertEqual(
@@ -178,11 +201,12 @@ class LayoutPrototypeTest(unittest.TestCase):
             ],
         )
         dates = {widget.label: widget for widget in app.date_input}
-        self.assertTrue(dates["From"].disabled)
-        self.assertTrue(dates["To"].disabled)
-        self.assertFalse(dates["Crash date range"].disabled)
+        self.assertFalse(dates["From"].disabled)
+        self.assertFalse(dates["To"].disabled)
+        self.assertEqual(set(dates), {"From", "To"})
         selectboxes = {widget.label: widget for widget in app.selectbox}
-        self.assertTrue(selectboxes["Area"].disabled)
+        self.assertFalse(selectboxes["Area"].disabled)
+        self.assertIn("Rockville", selectboxes["Area"].options)
         self.assertFalse(selectboxes["Time of day"].disabled)
         self.assertEqual(selectboxes["Station activity"].value, "Most active")
         sliders = {widget.label: widget for widget in app.slider}
@@ -213,13 +237,16 @@ class LayoutPrototypeTest(unittest.TestCase):
         self.assertCountEqual(
             [button.label for button in app.button],
             [
-                "Clear selection",
+                "Reset filters",
                 "Clear selection",
                 "Clear selection",
                 "Clear selection",
             ],
         )
-        self.assertTrue(all(button.disabled for button in app.button))
+        self.assertFalse(next(button for button in app.button if button.label == "Reset filters").disabled)
+        self.assertTrue(
+            all(button.disabled for button in app.button if button.label == "Clear selection")
+        )
 
         selectboxes["Time of day"].set_value("Overnight")
         selectboxes["Station activity"].set_value("Least active")
@@ -231,6 +258,15 @@ class LayoutPrototypeTest(unittest.TestCase):
         )
         self.assertTrue(
             any("Bottom 15 mapped stations" in caption.value for caption in app.caption)
+        )
+
+        next(widget for widget in app.selectbox if widget.label == "Time of day").set_value("All day")
+        next(widget for widget in app.selectbox if widget.label == "Area").set_value("Rockville")
+        app.run(timeout=15)
+        self.assertFalse(app.exception)
+        self.assertEqual(
+            next(widget for widget in app.selectbox if widget.label == "Area").value,
+            "Rockville",
         )
 
         rendered_text = "\n".join(

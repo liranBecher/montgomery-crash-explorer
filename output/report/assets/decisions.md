@@ -18,10 +18,17 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
 - The maps share the same light CARTO basemap, white cell outline, warm
   sequential low-to-high palette, hover highlighting, and dark selected-cell
   ring.
-- The warm color scale is normalized to the active filtered data in each view.
-  Therefore the palette is visually consistent across tabs, but the same shade
-  of red does not imply the same absolute crash count in different tabs or
-  filter states.
+- The warm color scale is recalculated whenever the active filters change. The
+  lowest visible value is assigned the light end of the palette and the highest
+  visible value the dark end, with the other values distributed between them.
+  This improves contrast within the current result set, especially when a
+  filter leaves a narrow range of counts.
+- Because the scale's minimum and maximum can change, color is only comparable
+  within the current map state. A dark-red cell might represent 12 crashes in
+  one filter state and 80 in another; identical shades do not guarantee
+  identical counts across tabs or filter states. The legend updates to show the
+  current numeric range, so users should consult it after changing a filter
+  rather than comparing colors from memory.
 - Legends use the same visual vocabulary for the quantitative gradient and
   selected grid cell. Domain-specific symbols, such as Fire & Rescue station
   crosses and station-radius context, are added without changing the base map

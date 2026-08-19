@@ -1,6 +1,6 @@
 """Interactive Fire & Rescue Proximity view."""
 
-from datetime import date, timedelta
+from datetime import date
 from html import escape
 from pathlib import Path
 
@@ -10,6 +10,7 @@ import pandas as pd
 import pydeck as pdk
 import streamlit as st
 from . import colors
+from .components import SharedFilters, apply_shared_filters
 from .map_layers import (
     cell_view_state,
     crash_point_layer,
@@ -628,7 +629,7 @@ def render_map_selection_box(
     )
 
 
-def render_fire_rescue_view() -> None:
+def render_fire_rescue_view(shared_filters: SharedFilters) -> None:
     """Render the connected Fire & Rescue Proximity analysis."""
     st.markdown(
         """
@@ -640,36 +641,11 @@ def render_fire_rescue_view() -> None:
         unsafe_allow_html=True,
     )
     crashes, cells, stations = load_fire_rescue_data()
-    minimum_date = crashes["crash_datetime"].min().date()
-    maximum_date = crashes["crash_datetime"].max().date()
-    default_start_date = max(minimum_date, maximum_date - timedelta(days=365 * 5))
-    date_range_key = f"fire_rescue_date_range_{maximum_date.isoformat()}"
-    st.session_state.setdefault(
-            date_range_key, (default_start_date, maximum_date)
-        )
+    crashes = apply_shared_filters(crashes, shared_filters)
 
-    stored_date_range = st.session_state.get(date_range_key)
-    if isinstance(stored_date_range, (tuple, list)) and len(stored_date_range) == 2:
-        stored_start_date, stored_end_date = stored_date_range
-        st.session_state[date_range_key] = _bound_date_range(
-            stored_start_date,
-            stored_end_date,
-            minimum_date,
-            maximum_date,
-        )
-
-    date_column, daypart_column, severity_column, sample_column = st.columns(
-        [1.4, 1, 1.35, 0.8], gap="medium"
+    daypart_column, severity_column, sample_column = st.columns(
+        [1, 1.35, 0.8], gap="medium"
     )
-    with date_column:
-        date_range = st.date_input(
-            "Crash date range",
-            min_value=minimum_date,
-            max_value=max(maximum_date, date.today()),
-            key=date_range_key,
-            on_change=_bound_date_range_state,
-            args=(date_range_key, minimum_date, maximum_date),
-        )
     with daypart_column:
         daypart = st.selectbox("Time of day", DAYPARTS, key="fire_rescue_daypart")
     with severity_column:
@@ -689,14 +665,7 @@ def render_fire_rescue_view() -> None:
             key="fire_rescue_minimum_sample",
         )
 
-    if not isinstance(date_range, (tuple, list)) or len(date_range) != 2:
-        st.info("Choose both a start and end date.")
-        return
-    start_date, end_date = date_range
-    filtered = crashes[
-        crashes["crash_datetime"].dt.date.between(start_date, end_date)
-        & crashes["severity"].isin(severities)
-    ]
+    filtered = crashes[crashes["severity"].isin(severities)]
     if daypart != "All day":
         filtered = filtered[filtered["daypart"].eq(daypart)]
 
@@ -705,7 +674,7 @@ def render_fire_rescue_view() -> None:
         cells,
         stations,
         int(minimum_sample),
-        end_date,
+        shared_filters.end_date,
     )
 
 

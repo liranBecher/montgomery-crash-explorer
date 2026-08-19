@@ -1,6 +1,6 @@
 """Interactive Safety Hotspots overview."""
 
-from datetime import date, timedelta
+from datetime import date
 from html import escape
 from pathlib import Path
 from statistics import mean
@@ -9,6 +9,7 @@ import altair as alt
 import pandas as pd
 import pydeck as pdk
 import streamlit as st
+from .components import SharedFilters, apply_shared_filters
 import streamlit.components.v1 as components
 
 from . import colors
@@ -783,7 +784,7 @@ def _render_safety_layout_css() -> None:
         unsafe_allow_html=True,
     )
 
-def render_safety_hotspots_view() -> None:
+def render_safety_hotspots_view(shared_filters: SharedFilters) -> None:
     """Render the connected Safety Hotspots analysis."""
     _render_safety_layout_css()
     st.markdown(
@@ -796,21 +797,9 @@ def render_safety_hotspots_view() -> None:
         unsafe_allow_html=True,
     )
     crashes = load_safety_hotspots_data()
-    minimum_date = crashes["crash_datetime"].min().date()
-    maximum_date = crashes["crash_datetime"].max().date()
-    date_key = f"safety_date_range_{maximum_date.isoformat()}"
-    st.session_state.setdefault(
-        date_key, (max(minimum_date, maximum_date - timedelta(days=365 * 5)), maximum_date)
-    )
+    crashes = apply_shared_filters(crashes, shared_filters)
 
-    date_column, filters_column, mode_column = st.columns([1, 1, 1], gap="small")
-    with date_column:
-        date_range = st.date_input(
-            "Safety crash date range",
-            min_value=minimum_date,
-            max_value=max(maximum_date, date.today()),
-            key=date_key,
-        )
+    filters_column, mode_column = st.columns([1, 1], gap="small")
     with filters_column:
         st.markdown("<div style='height:1.75rem'></div>", unsafe_allow_html=True)
         with st.popover("Safety filters", width="stretch"):
@@ -826,16 +815,12 @@ def render_safety_hotspots_view() -> None:
             
     with mode_column:
         mode = st.selectbox("Hotspot mode", HOTSPOT_MODES, key="safety_hotspot_mode")
-    if not isinstance(date_range, (tuple, list)) or len(date_range) != 2:
-        st.info("Choose both a start and end date.")
-        return
-
-    start_date, end_date = date_range
-    filtered = crashes[crashes["crash_datetime"].dt.date.between(start_date, end_date)]
-    filtered = filter_safety_conditions(filtered, condition_selections)
+    filtered = filter_safety_conditions(crashes, condition_selections)
     if HOTSPOT_MODES[mode]:
         filtered = filtered[filtered["serious_or_fatal"]]
-    render_safety_hotspots_visuals(filtered, mode, start_date, end_date)
+    render_safety_hotspots_visuals(
+        filtered, mode, shared_filters.start_date, shared_filters.end_date
+    )
 
 
 @st.fragment

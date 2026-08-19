@@ -21,12 +21,12 @@ follow-up analyses of fire-station proximity and alcohol-related patterns.
 | Implemented | Remaining work |
 | --- | --- |
 | Public Streamlit interface plus Safety Hotspots, Fire & Rescue, and Police Breathalyzers analyses | Final validated findings and recommendations |
-| Three connected analyses with responsive maps and charts | Shared cross-tab filters and selections |
+| Three connected analyses with responsive maps and charts | Shared cross-tab chart selections |
 | Safety, Fire & Rescue, and alcohol filters with linked chart selections | Accessibility, browser, performance, and comprehension evaluation |
 | Automated preprocessing and interface contracts | — |
 
-All three tabs are connected to processed data and provide local filters and
-linked selections.
+All three tabs are connected to processed data, share the sidebar date and area
+filters, and provide linked local chart selections.
 
 ## Run locally
 

@@ -108,8 +108,9 @@ selection will restore the countywide overview.
 | Select an alcohol-related area or time cell | Alcohol map, timing view, and selection summary |
 | Clear selection | Restore the shared-filter overview in the active tab |
 
-The Streamlit implementation supports chart selection and linking within each
-tab. Shared cross-tab filters and selections remain future work.
+The Streamlit implementation supports shared date and municipality filters plus
+chart selection and linking within each tab. Shared cross-tab chart selections
+remain future work.
 
 ## Visualization correctness constraints
 

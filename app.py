@@ -20,7 +20,7 @@ st.set_page_config(
 
 load_styles()
 render_app_header()
-render_sidebar()
+shared_filters = render_sidebar()
 
 safety, responders, breathalyzers = st.tabs(
     [
@@ -31,10 +31,10 @@ safety, responders, breathalyzers = st.tabs(
 )
 
 with safety:
-    render_safety_view()
+    render_safety_view(shared_filters)
 
 with responders:
-    render_responder_view()
+    render_responder_view(shared_filters)
 
 with breathalyzers:
-    render_alcohol_enforcement_view()
+    render_alcohol_enforcement_view(shared_filters)

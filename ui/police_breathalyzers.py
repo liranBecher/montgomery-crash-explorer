@@ -361,7 +361,7 @@ def render_legend(cells: pd.DataFrame, measure: str) -> None:
         f"""
         <section class="mce-viz-legend" aria-label="Alcohol map legend">
             <strong>Map legend</strong>
-            <span class="mce-legend-item"><span class="mce-legend-gradient" aria-hidden="true"></span>{escape(value_label)} per grid cell: {formatted}</span>
+            <span class="mce-legend-item"><span class="mce-legend-gradient" aria-hidden="true" style="width: 80px;">{maximum}</span>{escape(value_label)} per grid cell: {formatted}</span>
             <span class="mce-legend-item"><span class="mce-legend-ring" aria-hidden="true"></span>Selected grid cell</span>
         </section>
         """,
@@ -467,37 +467,36 @@ def render_police_breathalyzer_visuals(
     timing_alcohol = alcohol if selected_cell is None else alcohol[alcohol["cell_id"].eq(selected_cell)]
     timing = aggregate_timing(timing_all, timing_alcohol)
 
-    summary, clear = st.columns([3.5, 1])
-    with summary:
+    map_column, timing_column = st.columns([1.2, 1], gap="medium")
+    with map_column:
+        map_title_column, map_clear_column = st.columns([4.2, 1.25], gap="small", vertical_alignment="center")
+        with map_title_column:
+            st.subheader(
+                "Alcohol-related crashes by grid cell",
+                help=(
+                    "Each grid tile represents an aggregated crash cell. Darker color means more "
+                    "crashes for the selected filtering. Click a cell to focus the timing chart "
+                    "on that cell."
+                ),
+            )
+        with map_clear_column:
+            if st.button(
+                "Clear selection",
+                disabled=selected_cell is None and selected_weekday is None,
+                width="stretch",
+                key="alcohol_clear_selection",
+            ):
+                st.session_state["alcohol_selected_cell"] = None
+                st.session_state["alcohol_selected_weekday"] = None
+                st.session_state["alcohol_selected_hour"] = None
+                st.session_state["alcohol_map_generation"] = map_generation + 1
+                st.session_state["alcohol_heatmap_generation"] = heatmap_generation + 1
+                st.rerun()
         geography = f"grid cell {selected_cell}" if selected_cell else "countywide"
         time_context = f" · {selected_weekday} {selected_hour:02d}:00" if selected_weekday else ""
         st.caption(
             f"{len(alcohol):,} selected alcohol-related crashes out of {len(dated):,} total · {geography}{time_context}"
             + (" · map minimum automatically reduced to 1 crash per cell" if selected_weekday else "")
-        )
-    with clear:
-        if st.button(
-            "Clear alcohol selection",
-            disabled=selected_cell is None and selected_weekday is None,
-            width="stretch",
-            key="alcohol_clear_selection",
-        ):
-            st.session_state["alcohol_selected_cell"] = None
-            st.session_state["alcohol_selected_weekday"] = None
-            st.session_state["alcohol_selected_hour"] = None
-            st.session_state["alcohol_map_generation"] = map_generation + 1
-            st.session_state["alcohol_heatmap_generation"] = heatmap_generation + 1
-            st.rerun()
-
-    map_column, timing_column = st.columns([1.2, 1], gap="medium")
-    with map_column:
-        st.subheader(
-            "Alcohol-related crashes by grid cell",
-            help=(
-                "Each grid tile represents an aggregated crash cell. Darker color means more "
-                "crashes for the selected filtering. Click a cell to focus the timing chart "
-                "on that cell."
-            ),
         )
         if mapped.empty:
             st.warning("No grid cells meet the current filters and minimum sample. Try a lower minimum sample.")

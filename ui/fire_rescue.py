@@ -537,8 +537,9 @@ def render_map_legend(cells: pd.DataFrame, selected_station: str | None) -> None
         <section class="mce-viz-legend" aria-label="Map legend">
             <strong>Map legend</strong>
             <span class="mce-legend-item">
-                <span class="mce-legend-gradient" aria-hidden="true"></span>
-                Filtered crash count per grid cell: color ({minimum}–{maximum})
+                {minimum}
+                <span class="mce-legend-gradient" aria-hidden="true" style="width: 80px;"></span>
+                {maximum}  Filtered crash count per grid cell: color
             </span>
             <span class="mce-legend-item">
                 <span class="mce-legend-cross" aria-hidden="true">+</span>
@@ -741,32 +742,32 @@ def render_fire_rescue_visuals(
         st.session_state["fire_rescue_zoom_to_station"] = False
         st.rerun()
 
-    summary, clear = st.columns([3.4, 1])
-    with summary:
-        st.caption(
-            f"{len(filtered):,} filtered crashes · {len(visible_cells):,} visible cells · "
-            f"{len(stations)} mapped stations · distances are straight-line kilometres"
-        )
-    with clear:
-        if st.button(
-            "Clear map selection",
-            disabled=selected_cell is None and selected_station is None,
-            width="stretch",
-            key="fire_rescue_clear_selection",
-        ):
-            _set_selection(None, None)
-            st.session_state["fire_rescue_zoom_to_station"] = False
-            st.session_state["fire_rescue_map_generation"] = map_generation + 1
-            st.session_state["fire_rescue_scatter_generation"] = scatter_generation + 1
-            st.rerun()
     station_counts = aggregate_station_radius(filtered, stations, radius_km)
 
     map_column, scatter_column = st.columns([1.65, 0.9], gap="medium")
     with map_column:
-        st.subheader(
-            "Crash demand and mapped stations",
-            help="Explore crash clusters across the county. See how fire stations are spread to cover crashes."
+        map_title_column, map_clear_column = st.columns([4.2, 1.25], gap="small", vertical_alignment="center")
+        with map_title_column:
+            st.subheader(
+                "Crash demand and mapped stations",
+                help="Explore crash clusters across the county. See how fire stations are spread to cover crashes.",
             )
+        with map_clear_column:
+            if st.button(
+                "Clear selection",
+                disabled=selected_cell is None and selected_station is None,
+                width="stretch",
+                key="fire_rescue_clear_selection",
+            ):
+                _set_selection(None, None)
+                st.session_state["fire_rescue_zoom_to_station"] = False
+                st.session_state["fire_rescue_map_generation"] = map_generation + 1
+                st.session_state["fire_rescue_scatter_generation"] = scatter_generation + 1
+                st.rerun()
+        st.caption(
+            f"{len(filtered):,} filtered crashes · {len(visible_cells):,} visible cells · "
+            f"{len(stations)} mapped stations · distances are straight-line kilometres"
+        )
         render_map_legend(visible_cells, selected_station)
         map_key = f"fire_rescue_map_{map_generation}"
         st.pydeck_chart(

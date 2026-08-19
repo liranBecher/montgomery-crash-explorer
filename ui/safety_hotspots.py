@@ -63,6 +63,18 @@ def load_safety_hotspots_data() -> pd.DataFrame:
     return pd.read_parquet(CRASHES_FILE)
 
 
+def filter_safety_conditions(
+    crashes: pd.DataFrame, selections: dict[str, list[str]]
+) -> pd.DataFrame:
+    """Keep crashes matching every active condition-family selection."""
+    filtered = crashes
+    for family, selected in selections.items():
+        if selected:
+            column = CONDITION_FAMILIES[family][0]
+            filtered = filtered[filtered[column].isin(selected)]
+    return filtered
+
+
 def _cell_centers(cell_ids: pd.Series) -> pd.DataFrame:
     cells = pd.DataFrame({"cell_id": cell_ids.drop_duplicates().sort_values()})
     parts = cells["cell_id"].str.split(":", expand=True).astype(float)
@@ -626,8 +638,8 @@ def build_hotspot_signature_svg(signature_scores: dict, selection_summary: dict 
                 cursor: help; outline: none;
             }}
             .tooltip {{
-                position: absolute; top: 10px; left: 10px; z-index: 2;
-                display: grid; gap: 3px; width: min(310px, calc(100% - 20px));
+                position: absolute; top: 0; left: 0; z-index: 2;
+                display: grid; gap: 3px; width: 100%;
                 padding: 9px 11px; border: 1px solid rgba(100, 118, 116, 0.28);
                 border-radius: 8px; background: rgba(246, 240, 230, 0.96);
                 color: #344451; font-size: 12px;
@@ -640,7 +652,7 @@ def build_hotspot_signature_svg(signature_scores: dict, selection_summary: dict 
             .card:has(.surface-target:is(:hover,:focus)) .tooltip.surface,
             .card:has(.light-target:is(:hover,:focus)) .tooltip.light {{ opacity: 1; }}
             .legend {{
-                display: grid; align-content: start; gap: 7px;
+                position: relative; display: grid; align-content: start; gap: 7px;
                 padding-top: 8px; font-size: 11px;
             }}
             .legend-row {{ display: flex; align-items: center; gap: 7px; min-width: 0; }}
@@ -677,9 +689,9 @@ def build_hotspot_signature_svg(signature_scores: dict, selection_summary: dict 
                     <svg viewBox="0 0 256 256" role="img" aria-label="Crash fingerprint for the selected hotspot">
                         {''.join(groups)}
                     </svg>
-                    {''.join(tooltips)}
                 </div>
                 <div class="legend" aria-label="Fingerprint legend">
+                    {''.join(tooltips)}
                     <div class="legend-row"><span class="line faint"></span><span>Faint fill — more different</span></div>
                     <div class="legend-row"><span class="line solid"></span><span>Solid outline — fixed reference</span></div>
                     <div class="legend-row family-target weather-target" tabindex="0"><span class="family-swatch" style="--swatch-color:{family_colors['Weather']}"></span><span>Weather · {1 - signature_scores['families']['Weather']['distance']:.1%} similar</span></div>
@@ -698,8 +710,8 @@ def _render_map_legend(cells: pd.DataFrame) -> None:
         f"""
         <section class="mce-safety-map-legend" aria-label="Safety hotspot map legend">
             <strong>Map</strong>
-            <span class="mce-legend-item"><span class="mce-legend-gradient" aria-hidden="true"></span>Crash count {int(cells['crash_count'].min())}–{int(cells['crash_count'].max())}</span>
-            <span class="mce-legend-item"><span class="mce-legend-ring" aria-hidden="true"></span>Selected cell</span>
+            <span class="mce-legend-item">{int(cells['crash_count'].min())}<span class="mce-legend-gradient" aria-hidden="true" style="width: 80px;"></span>{int(cells['crash_count'].max())} Crash count</span>
+            <span class="mce-legend-item"><span class="mce-legend-ring" aria-hidden="true" style="width: 16px; height: 16px;"></span>Selected cell</span>
         </section>
         """,
         unsafe_allow_html=True,
@@ -748,7 +760,7 @@ def _render_safety_layout_css() -> None:
                 width: 34px; height: 8px; border-radius: 999px;
             }
             .mce-safety-map-legend .mce-legend-ring {
-                width: 10px; height: 10px; border: 2px solid #14202b; border-radius: 2px;
+                width: 16px; height: 16px; border: 2px solid #14202b; border-radius: 50%;
             }
             .mce-safety-conditions-head {
                 display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -759,7 +771,7 @@ def _render_safety_layout_css() -> None:
                 color: #5d6b78; font-size: 11px; flex-wrap: wrap;
             }
             .mce-condition-key { display: inline-flex; align-items: center; gap: 5px; }
-            .mce-condition-swatch { width: 9px; height: 9px; border-radius: 1px; display: inline-block; }
+            .mce-condition-swatch { width: 16px; height: 16px; border-radius: 50%; display: inline-block; }
             .mce-condition-swatch.selected { background: #d95f45; }
             .mce-condition-swatch.county { background: #69aaa4; }
             .mce-safety-context { color: #687985; font-size: 11px; margin: 0 0 3px 0; }
@@ -791,7 +803,7 @@ def render_safety_hotspots_view() -> None:
         date_key, (max(minimum_date, maximum_date - timedelta(days=365 * 5)), maximum_date)
     )
 
-    date_column, mode_column = st.columns([1.35, 1], gap="small")
+    date_column, filters_column, mode_column = st.columns([1, 1, 1], gap="small")
     with date_column:
         date_range = st.date_input(
             "Safety crash date range",
@@ -799,6 +811,19 @@ def render_safety_hotspots_view() -> None:
             max_value=max(maximum_date, date.today()),
             key=date_key,
         )
+    with filters_column:
+        st.markdown("<div style='height:1.75rem'></div>", unsafe_allow_html=True)
+        with st.popover("Safety filters", width="stretch"):
+            condition_selections = {
+                family: st.multiselect(
+                    family,
+                    categories,
+                    placeholder="All",
+                    key=f"safety_{column}_filter",
+                )
+                for family, (column, categories) in CONDITION_FAMILIES.items()
+            }
+            
     with mode_column:
         mode = st.selectbox("Hotspot mode", HOTSPOT_MODES, key="safety_hotspot_mode")
     if not isinstance(date_range, (tuple, list)) or len(date_range) != 2:
@@ -807,6 +832,7 @@ def render_safety_hotspots_view() -> None:
 
     start_date, end_date = date_range
     filtered = crashes[crashes["crash_datetime"].dt.date.between(start_date, end_date)]
+    filtered = filter_safety_conditions(filtered, condition_selections)
     if HOTSPOT_MODES[mode]:
         filtered = filtered[filtered["serious_or_fatal"]]
     render_safety_hotspots_visuals(filtered, mode, start_date, end_date)

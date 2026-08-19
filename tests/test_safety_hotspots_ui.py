@@ -15,6 +15,7 @@ from ui.safety_hotspots import (
     build_map,
     build_hotspot_signature_svg,
     calculate_signature_scores,
+    filter_safety_conditions,
 )
 
 
@@ -73,6 +74,17 @@ class SafetyHotspotsUiTest(unittest.TestCase):
         monday_one = timing[timing["weekday"].eq("Monday") & timing["hour"].eq(1)].iloc[0]
         self.assertEqual(monday_one["crash_count"], 2)
         self.assertEqual(monday_one["share_pct"], 50)
+
+    def test_filters_safety_conditions_across_families(self) -> None:
+        filtered = filter_safety_conditions(
+            self.crashes,
+            {"Weather": ["Clear"], "Surface": ["Dry"], "Light": ["Daylight"]},
+        )
+        self.assertEqual(filtered["report_number"].tolist(), ["A", "C"])
+        self.assertEqual(
+            len(filter_safety_conditions(self.crashes, {"Weather": []})),
+            len(self.crashes),
+        )
 
     def test_builds_linked_views_and_parses_selections(self) -> None:
         cells = aggregate_cells(self.crashes)

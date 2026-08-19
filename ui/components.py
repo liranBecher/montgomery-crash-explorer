@@ -16,7 +16,6 @@ SHARED_CRASHES_FILE = (
     / "alcohol_crashes.parquet"
 )
 ALL_AREAS = "All Montgomery County"
-UNINCORPORATED = "Unincorporated / not recorded"
 
 
 class SharedFilters(NamedTuple):
@@ -28,13 +27,7 @@ class SharedFilters(NamedTuple):
 
 @st.cache_data
 def _load_shared_filter_data() -> pd.DataFrame:
-    crashes = pd.read_parquet(
-        SHARED_CRASHES_FILE,
-        columns=["report_number", "crash_datetime", "municipality"],
-    )
-    crashes["area"] = crashes["municipality"].fillna(UNINCORPORATED).str.title()
-    crashes.loc[crashes["municipality"].isna(), "area"] = UNINCORPORATED
-    return crashes
+    return pd.read_parquet(SHARED_CRASHES_FILE, columns=["crash_datetime"])
 
 
 def apply_shared_filters(crashes: pd.DataFrame, filters: SharedFilters) -> pd.DataFrame:
@@ -50,7 +43,6 @@ def apply_shared_filters(crashes: pd.DataFrame, filters: SharedFilters) -> pd.Da
 def _reset_shared_filters(start_date: date, end_date: date) -> None:
     st.session_state["filter_start_date"] = start_date
     st.session_state["filter_end_date"] = end_date
-    st.session_state["filter_area"] = ALL_AREAS
     for key in tuple(st.session_state):
         if key.endswith(("_selected_cell", "_selected_station", "_selected_weekday", "_selected_hour")):
             st.session_state[key] = None
@@ -84,13 +76,10 @@ def render_sidebar() -> SharedFilters:
     minimum_date = crashes["crash_datetime"].min().date()
     maximum_date = crashes["crash_datetime"].max().date()
     default_start_date = max(minimum_date, maximum_date - timedelta(days=365 * 5))
-    areas = [ALL_AREAS, *sorted(crashes["area"].unique())]
     if not isinstance(st.session_state.get("filter_start_date"), date):
         st.session_state["filter_start_date"] = default_start_date
     if not isinstance(st.session_state.get("filter_end_date"), date):
         st.session_state["filter_end_date"] = maximum_date
-    if st.session_state.get("filter_area") not in areas:
-        st.session_state["filter_area"] = ALL_AREAS
 
     with st.sidebar:
         st.header("Shared filters")
@@ -107,7 +96,6 @@ def render_sidebar() -> SharedFilters:
             max_value=maximum_date,
             key="filter_end_date",
         )
-        area = st.selectbox("Area", options=areas, key="filter_area")
         if start_date > end_date:
             st.error("From must be on or before To.")
         st.button(
@@ -117,10 +105,7 @@ def render_sidebar() -> SharedFilters:
             args=(default_start_date, maximum_date),
         )
 
-    report_numbers = None
-    if area != ALL_AREAS:
-        report_numbers = frozenset(crashes.loc[crashes["area"].eq(area), "report_number"])
-    return SharedFilters(start_date, end_date, area, report_numbers)
+    return SharedFilters(start_date, end_date, ALL_AREAS, None)
 
 
 def render_view_header(title: str, description: str, control_label: str, key: str) -> None:

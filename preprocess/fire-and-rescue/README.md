@@ -62,7 +62,9 @@ city, latitude, and longitude.
 
 ## Limitations
 
-Distance is straight-line proximity from a grid-cell center. It is not road
+The cell table's distance is straight-line proximity from a grid-cell center;
+the interactive scatterplot instead calculates exact crash-level Haversine
+distances and shows their median within each cell. Neither measure is road
 travel time, dispatch history, a service area, or evidence about staffing,
 availability, or actual response performance. The 2026 data ends on August 5
 and is incomplete for annual comparisons.

@@ -498,16 +498,13 @@ def build_hotspot_signature_svg(signature_scores: dict, selection_summary: dict 
     """Render the hotspot fingerprint markup as a standalone HTML/SVG component."""
     ridge_paths = {
         "Weather": [
-            "M128,26a101.58,101.58,0,0,0-34,5.81,6,6,0,1,0,4,11.31A90.07,90.07,0,0,1,218,128a283.42,283.42,0,0,1-7,62.67,6,6,0,1,0,11.7,2.66A295.41,295.41,0,0,0,230,128,102.12,102.12,0,0,0,128,26Z",
-            "M68,60.92A6,6,0,0,0,60,52a102.19,102.19,0,0,0-34,76,89.32,89.32,0,0,1-8.15,37.5,6,6,0,1,0,10.9,5A101.12,101.12,0,0,0,38,128,90.15,90.15,0,0,1,68,60.92Z",
+            "M25,168 C36,145 31,111 48,81 C60,60 79,46 99,39 C132,28 166,39 191,62 C220,89 229,125 222,162 C220,176 216,187 211,193",
         ],
         "Surface": [
-            "M128,86a42.08,42.08,0,0,1,31.31,14,6,6,0,1,0,8.94-8A54,54,0,0,0,74,128a138.08,138.08,0,0,1-17.22,66.82,6,6,0,1,0,10.49,5.82A150.07,150.07,0,0,0,86,128,42,42,0,0,1,128,86Z",
-            "M182,128a244.65,244.65,0,0,1-18.38,93.48,6,6,0,0,1-5.55,3.72,6.13,6.13,0,0,1-2.28-.45,6,6,0,0,1-3.27-7.84A232.64,232.64,0,0,0,170,128a6,6,0,0,1,12,0Z",
+            "M62,198 C75,176 75,145 80,121 C86,93 104,80 128,80 C154,80 174,97 177,123 C181,155 173,189 158,222",
         ],
         "Light": [
-            "M128,122a6,6,0,0,0-6,6,186.54,186.54,0,0,1-5.86,46.5,6,6,0,0,0,4.32,7.31,5.93,5.93,0,0,0,1.5.19,6,6,0,0,0,5.8-4.5A198.75,198.75,0,0,0,134,128,6,6,0,0,0,128,122Z",
-            "M113.08,202.56a6,6,0,0,0-8,2.95c-2,4.24-4.09,8.47-6.36,12.57a6,6,0,0,0,2.34,8.15,5.88,5.88,0,0,0,2.9.76,6,6,0,0,0,5.25-3.09c2.42-4.36,4.7-8.87,6.78-13.39A6,6,0,0,0,113.08,202.56Z",
+            "M103,222 C111,208 117,191 121,175 C125,157 128,140 128,128",
         ],
     }
     family_colors = {"Weather": "#2f8f88", "Surface": "#d95f45", "Light": "#3b82f6"}
@@ -524,7 +521,7 @@ def build_hotspot_signature_svg(signature_scores: dict, selection_summary: dict 
                 body { margin: 0; font-family: system-ui, sans-serif; color: #5d6b78; }
                 .mce-fingerprint-empty { padding: 2px 0; }
                 svg { display: block; width: 100%; height: 125px; }
-                .ridge { fill: #9aabb4; fill-opacity: .32; stroke: rgba(20,32,43,0.9); stroke-width: 1.3; stroke-linejoin: round; stroke-linecap: round; }
+                .ridge { fill: none; stroke: #9aabb4; stroke-width: 10; stroke-linejoin: round; stroke-linecap: round; }
                 .copy { display: grid; gap: 2px; font-size: 12px; line-height: 1.25; }
                 .copy strong { color: #14202b; }
             </style>
@@ -545,18 +542,23 @@ def build_hotspot_signature_svg(signature_scores: dict, selection_summary: dict 
         details = signature_scores["families"][family]
         score = details["distance"]
         similarity = 1.0 - score
-        opacity = 0.18 + similarity * 0.82
         differences = "".join(
             f"<li>{escape(item['category'])}: {item['delta_pp']:+.1f} pp</li>"
             for item in details["largest_differences"]
         ) or "<li>No category-level difference</li>"
-        paths_html = "".join(f'<path class="mce-fingerprint-ridge ridge" d="{path}" />' for path in paths)
+        paths_html = "".join(
+            f'<path class="ridge-outline" d="{path}" />'
+            f'<path class="ridge-background" d="{path}" />'
+            f'<path class="mce-fingerprint-ridge ridge-fill" d="{path}" pathLength="1" '
+            f'stroke-dasharray="{similarity:.3f} 1" />'
+            for path in paths
+        )
         hit_paths_html = "".join(f'<path class="hit-area" d="{path}" />' for path in paths)
         tooltip_id = family.lower()
         groups.append(
             f'<g class="ridge-group {tooltip_id} {tooltip_id}-target" data-family="{tooltip_id}" tabindex="0" '
             f'role="img" aria-label="{family}: {score:.1%} difference from county" '
-            f'style="--family-color:{family_colors[family]};--family-opacity:{opacity:.2f}">{paths_html}{hit_paths_html}</g>'
+            f'style="--family-color:{family_colors[family]}">{paths_html}{hit_paths_html}</g>'
         )
         tooltips.append(
             f'<div class="tooltip {tooltip_id}" role="tooltip"><strong>{family}</strong>'
@@ -568,7 +570,7 @@ def build_hotspot_signature_svg(signature_scores: dict, selection_summary: dict 
     similarity = 1.0 - overall_difference
     if selection_summary:
         caution_html = (
-            '<span class="sample-caution">Fewer than 30 crashes; compare percentages cautiously.</span>'
+            '<span class="sample-caution">Fewer than 30 crashes;<br>compare percentages cautiously.</span>'
             if selection_summary["crash_count"] < 30
             else ""
         )
@@ -608,33 +610,48 @@ def build_hotspot_signature_svg(signature_scores: dict, selection_summary: dict 
             .ridge-group {{
                 cursor: help; outline: none;
             }}
-            .ridge-group .ridge {{
-                fill: var(--family-color);
-                fill-opacity: var(--family-opacity);
+            .ridge-group .ridge-fill {{
+                fill: none;
                 stroke: var(--family-color);
-                stroke-width: 4;
+                stroke-width: 7;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+                transition: filter .15s ease;
+            }}
+            .ridge-group .ridge-outline {{
+                fill: none;
+                stroke: var(--family-color);
+                stroke-width: 11;
                 stroke-linejoin: round;
                 stroke-linecap: round;
-                transition: fill-opacity .15s ease, filter .15s ease;
+                transition: filter .15s ease;
+            }}
+            .ridge-group .ridge-background {{
+                fill: none;
+                stroke: #f4f7f9;
+                stroke-width: 7;
+                stroke-linejoin: round;
+                stroke-linecap: round;
             }}
             .hit-area {{
                 fill: transparent; stroke: transparent; stroke-width: 16px; pointer-events: all;
             }}
-            .ridge-group:hover .ridge, .ridge-group:focus .ridge {{
+            .ridge-group:hover :is(.ridge-fill,.ridge-outline),
+            .ridge-group:focus :is(.ridge-fill,.ridge-outline) {{
                 filter: drop-shadow(0 0 2px rgba(20,32,43,.28));
             }}
-            svg:has(.ridge-group:hover) .ridge-group:not(:hover) .ridge,
-            svg:has(.ridge-group:focus) .ridge-group:not(:focus) .ridge {{
-                fill-opacity: .10;
+            svg:has(.ridge-group:hover) .ridge-group:not(:hover) .ridge-fill,
+            svg:has(.ridge-group:focus) .ridge-group:not(:focus) .ridge-fill {{
+                filter: grayscale(.8) brightness(1.25);
             }}
-            .card:has(.weather-target:is(:hover,:focus)) .ridge-group:not(.weather) .ridge,
-            .card:has(.surface-target:is(:hover,:focus)) .ridge-group:not(.surface) .ridge,
-            .card:has(.light-target:is(:hover,:focus)) .ridge-group:not(.light) .ridge {{
-                fill-opacity: .10;
+            .card:has(.weather-target:is(:hover,:focus)) .ridge-group:not(.weather) .ridge-fill,
+            .card:has(.surface-target:is(:hover,:focus)) .ridge-group:not(.surface) .ridge-fill,
+            .card:has(.light-target:is(:hover,:focus)) .ridge-group:not(.light) .ridge-fill {{
+                filter: grayscale(.8) brightness(1.25);
             }}
-            .card:has(.weather-target:is(:hover,:focus)) .weather .ridge,
-            .card:has(.surface-target:is(:hover,:focus)) .surface .ridge,
-            .card:has(.light-target:is(:hover,:focus)) .light .ridge {{
+            .card:has(.weather-target:is(:hover,:focus)) .weather :is(.ridge-fill,.ridge-outline),
+            .card:has(.surface-target:is(:hover,:focus)) .surface :is(.ridge-fill,.ridge-outline),
+            .card:has(.light-target:is(:hover,:focus)) .light :is(.ridge-fill,.ridge-outline) {{
                 filter: drop-shadow(0 0 2px rgba(20,32,43,.28));
                 cursor: help; outline: none;
             }}
@@ -657,8 +674,14 @@ def build_hotspot_signature_svg(signature_scores: dict, selection_summary: dict 
                 padding-top: 8px; font-size: 11px;
             }}
             .legend-row {{ display: flex; align-items: center; gap: 7px; min-width: 0; }}
-            .line {{ width: 28px; border-top: 3px solid #a8b5a9; flex: 0 0 auto; }}
-            .faint {{ opacity: .2; }} .solid {{ opacity: 1; }}
+            .area-key {{
+                position: relative; width: 28px; height: 15px; flex: 0 0 auto;
+                overflow: hidden; border: 2px solid #a8b5a9; border-radius: 2px;
+            }}
+            .area-key::after {{
+                content: ""; position: absolute; inset: 0 auto 0 0; width: 65%; background: #a8b5a9;
+            }}
+            .outline-key::after {{ display: none; }}
             .zone {{
                 min-width: 51px; padding: 2px 5px; border: 1px solid #9db1bb;
                 border-radius: 999px; color: #5d6b78; font-size: 9px;
@@ -678,6 +701,7 @@ def build_hotspot_signature_svg(signature_scores: dict, selection_summary: dict 
             .sample-caution {{
                 margin-left: auto; padding: 2px 7px; border-radius: 999px;
                 background: #f3f3d9; color: #7a6200; font-size: 10px;
+                line-height: 1.15; text-align: center;
             }}
         </style>
         <div class="card" aria-label="Hotspot fingerprint visualization">
@@ -693,8 +717,8 @@ def build_hotspot_signature_svg(signature_scores: dict, selection_summary: dict 
                 </div>
                 <div class="legend" aria-label="Fingerprint legend">
                     {''.join(tooltips)}
-                    <div class="legend-row"><span class="line faint"></span><span>Faint fill — more different</span></div>
-                    <div class="legend-row"><span class="line solid"></span><span>Solid outline — fixed reference</span></div>
+                    <div class="legend-row"><span class="area-key"></span><span>Colored area — similarity to county</span></div>
+                    <div class="legend-row"><span class="area-key outline-key"></span><span>Outline — fixed reference</span></div>
                     <div class="legend-row family-target weather-target" tabindex="0"><span class="family-swatch" style="--swatch-color:{family_colors['Weather']}"></span><span>Weather · {1 - signature_scores['families']['Weather']['distance']:.1%} similar</span></div>
                     <div class="legend-row family-target surface-target" tabindex="0"><span class="family-swatch" style="--swatch-color:{family_colors['Surface']}"></span><span>Surface · {1 - signature_scores['families']['Surface']['distance']:.1%} similar</span></div>
                     <div class="legend-row family-target light-target" tabindex="0"><span class="family-swatch" style="--swatch-color:{family_colors['Light']}"></span><span>Light · {1 - signature_scores['families']['Light']['distance']:.1%} similar</span></div>
@@ -810,9 +834,14 @@ def render_safety_hotspots_view(shared_filters: SharedFilters) -> None:
                     placeholder="All",
                     key=f"safety_{column}_filter",
                 )
-                for family, (column, categories) in CONDITION_FAMILIES.items()
-            }
-            
+                for family, (column, categories) in CONDITION_FAMILIES.items()            }
+            st.button("Clear all filters", 
+                      on_click=lambda: 
+                      st.session_state.update({f"safety_{column}_filter": [] for column,
+                                                _ in CONDITION_FAMILIES.values()}),
+                                                  width="stretch",
+                                                 type="secondary"
+                                                 )
     with mode_column:
         mode = st.selectbox("Hotspot mode", HOTSPOT_MODES, key="safety_hotspot_mode")
     filtered = filter_safety_conditions(crashes, condition_selections)
@@ -896,7 +925,7 @@ def render_safety_hotspots_visuals(
     with analysis_column:
         _render_section_title(
             "Hotspot fingerprint",
-            "The fingerprint summarizes how the selected hotspot differs from the county average. More opaque zones are more similar; hover a ridge or legend item for details.",
+            "The fingerprint summarizes how the selected hotspot differs from the county average. More filled zones are more similar; hover a ridge or legend item for details.",
         )
 
         selection_summary = None
@@ -916,7 +945,7 @@ def render_safety_hotspots_visuals(
                 calculate_signature_scores(fingerprint, selected_cell),
                 selection_summary,
             ),
-            height=225,
+            height=240,
             scrolling=False,
         )
 

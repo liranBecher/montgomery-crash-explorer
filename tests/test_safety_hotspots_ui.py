@@ -150,6 +150,11 @@ class SafetyHotspotsUiTest(unittest.TestCase):
         selected_svg = build_hotspot_signature_svg(calculate_signature_scores(fingerprint))
         self.assertIn("Weather", selected_svg)
         self.assertIn("mce-fingerprint-ridge", selected_svg)
+        self.assertIn('pathLength="1"', selected_svg)
+        self.assertIn("stroke-dasharray=", selected_svg)
+        self.assertIn("Colored area — similarity to county", selected_svg)
+        self.assertNotIn("--family-opacity", selected_svg)
+        self.assertEqual(selected_svg.count('class="mce-fingerprint-ridge ridge-fill"'), 3)
 
         summary = {
             "cell_id": "39.00:-77.10",
@@ -161,7 +166,7 @@ class SafetyHotspotsUiTest(unittest.TestCase):
             calculate_signature_scores(fingerprint), summary
         )
         self.assertIn('class="content"', selected_svg)
-        self.assertIn("Fewer than 30 crashes", selected_svg)
+        self.assertIn("Fewer than 30 crashes;<br>compare percentages cautiously.", selected_svg)
 
         summary["crash_count"] = 30
         selected_svg = build_hotspot_signature_svg(

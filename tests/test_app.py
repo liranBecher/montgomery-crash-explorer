@@ -10,7 +10,9 @@ from ui.fire_rescue import (
     _bound_date_range,
     _map_selection_callback,
     _map_selection_from_event,
+    aggregate_cells,
     aggregate_station_radius,
+    build_gap_scatter,
     build_map,
     build_station_radius_bar,
 )
@@ -134,11 +136,56 @@ class LayoutPrototypeTest(unittest.TestCase):
                 "severity_breakdown": ["Fatal: 1"],
                 "nearest_station_name": ["A"],
                 "nearest_station_distance_km": [0.0],
+                "median_crash_station_distance_km": [0.0],
             }
         )
         deck = build_map(cells, stations, crashes, None, None, 1.5, False)
         self.assertEqual(deck.layers[0].id, "crash-cells")
+        self.assertEqual(
+            deck.layers[0].data[0]["line_3"],
+            "Median crash distance to nearest station: 0.00 km",
+        )
         self.assertEqual(deck.initial_view_state.zoom, 8.6)
+
+    def test_scatter_proximity_uses_exact_crash_locations(self) -> None:
+        crashes = pd.DataFrame(
+            {
+                "report_number": ["A", "B"],
+                "crash_datetime": pd.to_datetime(["2026-01-01", "2026-01-02"]),
+                "cell_id": ["cell", "cell"],
+                "latitude": [0.0, 0.02],
+                "longitude": [0.0, 0.0],
+                "road_name": ["A ROAD", "A ROAD"],
+                "severity": ["Fatal Injury", "Suspected Serious Injury"],
+            }
+        )
+        cells = pd.DataFrame(
+            {
+                "cell_id": ["cell"],
+                "center_latitude": [1.0],
+                "center_longitude": [0.0],
+                "nearest_station_name": ["A"],
+                "nearest_station_distance_km": [111.2],
+            }
+        )
+        stations = pd.DataFrame(
+            {
+                "station_id": ["A"],
+                "station_name": ["A"],
+                "station_latitude": [0.0],
+                "station_longitude": [0.0],
+            }
+        )
+
+        result = aggregate_cells(crashes, cells, stations)
+
+        self.assertAlmostEqual(
+            result.loc[0, "median_crash_station_distance_km"], 1.112, places=3
+        )
+        self.assertEqual(
+            build_gap_scatter(result, None).to_dict()["layer"][0]["encoding"]["x"]["field"],
+            "median_crash_station_distance_km",
+        )
 
     def test_fire_map_semantic_zoom_preserves_station_zoom_priority(self) -> None:
         cells = pd.DataFrame(
@@ -150,6 +197,7 @@ class LayoutPrototypeTest(unittest.TestCase):
                 "severity_breakdown": ["Fatal: 1"],
                 "nearest_station_name": ["A"],
                 "nearest_station_distance_km": [0.2],
+                "median_crash_station_distance_km": [0.3],
             }
         )
         crashes = pd.DataFrame(

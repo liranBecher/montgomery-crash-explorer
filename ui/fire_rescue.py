@@ -84,8 +84,10 @@ def load_fire_rescue_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     )
 
 
-def aggregate_cells(filtered: pd.DataFrame, cells: pd.DataFrame) -> pd.DataFrame:
-    """Aggregate the active crash subset while retaining stable cell proximity."""
+def aggregate_cells(
+    filtered: pd.DataFrame, cells: pd.DataFrame, stations: pd.DataFrame
+) -> pd.DataFrame:
+    """Aggregate the active crash subset with exact crash-level proximity."""
     if filtered.empty:
         return cells.head(0).assign(
             crash_count=pd.Series(dtype="int64"),
@@ -95,11 +97,15 @@ def aggregate_cells(filtered: pd.DataFrame, cells: pd.DataFrame) -> pd.DataFrame
             first_crash=pd.Series(dtype="datetime64[ns]"),
             last_crash=pd.Series(dtype="datetime64[ns]"),
             common_roads=pd.Series(dtype="string"),
+            median_crash_station_distance_km=pd.Series(dtype="float64"),
         )
 
     working = filtered.assign(
         serious_count=filtered["severity"].eq("Suspected Serious Injury").astype(int),
         fatal_count=filtered["severity"].eq("Fatal Injury").astype(int),
+        crash_station_distance_km=station_distance_matrix(filtered, stations).min(
+            axis=1
+        ),
     )
     summary = working.groupby("cell_id", as_index=False).agg(
         crash_count=("report_number", "size"),
@@ -107,6 +113,7 @@ def aggregate_cells(filtered: pd.DataFrame, cells: pd.DataFrame) -> pd.DataFrame
         fatal_count=("fatal_count", "sum"),
         first_crash=("crash_datetime", "min"),
         last_crash=("crash_datetime", "max"),
+        median_crash_station_distance_km=("crash_station_distance_km", "median"),
     )
     severity_counts = (
         working.groupby(["cell_id", "severity"], as_index=False)
@@ -285,8 +292,8 @@ def build_map(
     demand["line_2"] = demand["severity_breakdown"]
     demand["line_3"] = demand.apply(
         lambda row: (
-            f"Nearest station: {row['nearest_station_name']} "
-            f"({row['nearest_station_distance_km']:.2f} km)"
+            "Median crash distance to nearest station: "
+            f"{row['median_crash_station_distance_km']:.2f} km"
         ),
         axis=1,
     )
@@ -403,7 +410,7 @@ def build_map(
 
 
 def build_gap_scatter(cells: pd.DataFrame, selected_cell: str | None) -> alt.Chart:
-    """Build the demand-distance relationship without an arbitrary gap score."""
+    """Plot cell demand against exact crash-level station proximity."""
     point_selection = alt.selection_point(
         name="cell_pick", fields=["cell_id"], toggle=False, clear="dblclick", empty=False
     )
@@ -418,8 +425,8 @@ def build_gap_scatter(cells: pd.DataFrame, selected_cell: str | None) -> alt.Cha
         .mark_circle(size=55, stroke="white", strokeWidth=0.8)
         .encode(
             x=alt.X(
-                "nearest_station_distance_km:Q",
-                title="Nearest mapped station (straight-line km)",
+                "median_crash_station_distance_km:Q",
+                title="Median crash-to-nearest-station distance (km)",
                 scale=alt.Scale(zero=True),
             ),
             y=alt.Y(
@@ -439,12 +446,15 @@ def build_gap_scatter(cells: pd.DataFrame, selected_cell: str | None) -> alt.Cha
             ),
             tooltip=[
                 alt.Tooltip("cell_id:N", title="Grid cell"),
-                alt.Tooltip("nearest_station_distance_km:Q", title="Distance (km)", format=".2f"),
+                alt.Tooltip(
+                    "median_crash_station_distance_km:Q",
+                    title="Median crash distance (km)",
+                    format=".2f",
+                ),
                 alt.Tooltip("crash_count:Q", title="Filtered crashes"),
                 alt.Tooltip("severity_breakdown:N", title="Severity breakdown"),
                 alt.Tooltip("serious_count:Q", title="Serious"),
                 alt.Tooltip("fatal_count:Q", title="Fatal"),
-                alt.Tooltip("nearest_station_name:N", title="Nearest station"),
                 alt.Tooltip("common_roads:N", title="Common roads"),
             ],
         )
@@ -452,7 +462,7 @@ def build_gap_scatter(cells: pd.DataFrame, selected_cell: str | None) -> alt.Cha
     )
     medians = pd.DataFrame(
         {
-            "distance": [cells["nearest_station_distance_km"].median()],
+            "distance": [cells["median_crash_station_distance_km"].median()],
             "count": [cells["crash_count"].median()],
         }
     )
@@ -551,6 +561,9 @@ def render_map_legend(cells: pd.DataFrame, selected_station: str | None) -> None
                 <span class="mce-legend-ring" aria-hidden="true"></span>
                 Selected grid cell
             </span>
+            <span class="mce-legend-item">
+                Cell details: median exact crash-to-nearest-station distance
+            </span>
             {station_context}
         </section>
         """,
@@ -566,7 +579,7 @@ def render_scatter_legend() -> None:
             <strong>Scatterplot legend</strong>
             <span class="mce-legend-item">
                 <span class="mce-legend-dot mce-legend-cell" aria-hidden="true"></span>
-                Grid cell
+                Grid cell (x: median of exact crash distances)
             </span>
             <span class="mce-legend-item">
                 <span class="mce-legend-dot mce-legend-selected" aria-hidden="true"></span>
@@ -574,7 +587,7 @@ def render_scatter_legend() -> None:
             </span>
             <span class="mce-legend-item">
                 <span class="mce-legend-line" aria-hidden="true"></span>
-                Visible-cell medians
+                Median reference lines across visible cells
             </span>
         </section>
         """,
@@ -598,8 +611,8 @@ def render_map_selection_box(
         title = f"Grid cell {row['cell_id']}"
         primary = f"{row['crash_count']:,} filtered crashes · {row['severity_breakdown']}"
         secondary = (
-            f"Nearest: {row['nearest_station_name']} · "
-            f"{row['nearest_station_distance_km']:.2f} km straight-line"
+            "Median crash distance to nearest mapped station · "
+            f"{row['median_crash_station_distance_km']:.2f} km straight-line"
         )
         detail = (
             f"{row['first_crash']:%b %d, %Y}–{row['last_crash']:%b %d, %Y} · "
@@ -687,7 +700,7 @@ def render_fire_rescue_visuals(
     end_date: date,
 ) -> None:
     """Render only the linked charts that need to update on selection."""
-    visible_cells = aggregate_cells(filtered, cells)
+    visible_cells = aggregate_cells(filtered, cells, stations)
     visible_cells = visible_cells[
         visible_cells["crash_count"].ge(minimum_sample)
     ].reset_index(drop=True)
@@ -736,7 +749,8 @@ def render_fire_rescue_visuals(
                 st.rerun()
         st.caption(
             f"{len(filtered):,} filtered crashes · {len(visible_cells):,} visible cells · "
-            f"{len(stations)} mapped stations · distances are straight-line kilometres"
+            f"{len(stations)} mapped stations · cell distances are medians of exact "
+            "crash-level Haversine distances"
         )
         render_map_legend(visible_cells, selected_station)
         map_key = f"fire_rescue_map_{map_generation}"
@@ -766,8 +780,11 @@ def render_fire_rescue_visuals(
     with scatter_column:
         st.subheader(
             "Demand versus station proximity",
-            help="Cells toward the upper-right combine more crashes with greater distance."
-            )
+            help=(
+                "Cells toward the upper-right combine more crashes with a greater "
+                "median exact crash-to-nearest-station distance."
+            ),
+        )
         render_scatter_legend()
         scatter_key = f"fire_rescue_scatter_{scatter_generation}"
         st.altair_chart(
@@ -775,6 +792,11 @@ def render_fire_rescue_visuals(
             key=scatter_key,
             on_select=lambda: _scatter_selection_callback(scatter_key),
             selection_mode="cell_pick",
+        )
+        st.caption(
+            "Context: NFPA 1710 uses a 4-minute first-engine travel-time "
+            "benchmark. Distance here is shown only as straight-line geographic "
+            "proximity and should not be converted directly to response time."
         )
 
     st.subheader(

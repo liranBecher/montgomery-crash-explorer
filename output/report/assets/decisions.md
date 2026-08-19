@@ -185,9 +185,9 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
 
 ### Companion views
 
-- The scatterplot compares nearest-station straight-line distance (x) with
-  filtered crash count (y). It intentionally avoids an arbitrary composite
-  "gap score."
+- The scatterplot compares the median exact crash-to-nearest-station
+  straight-line distance within each grid cell (x) with filtered crash count
+  (y). It intentionally avoids an arbitrary composite "gap score."
 - The station bar chart ranks stations by the number of filtered crashes inside
   the selected radius. It supports **Most active** and **Least active** views.
 - Each station is counted independently in the bar chart, so a crash can occur

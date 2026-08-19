@@ -75,9 +75,9 @@ selection will restore the countywide overview.
   clearly labeled layers. Fatal, suspected-serious, and possible injury are
   available; suspected-serious and fatal are selected by default. Minor and
   no-apparent-injury records remain in processed data but are not UI options.
-- Linked detail view: occupied grid cells plotted by crash count and Haversine
-  distance from cell center to the nearest mapped station. Grid-cell circles
-  use a uniform size so position remains the only quantitative encoding.
+- Linked detail view: occupied grid cells plotted by crash count and the median
+  crash-level Haversine distance to the nearest mapped station. Grid-cell
+  circles use a uniform size so position remains the only quantitative encoding.
 - Station comparison: a ranked horizontal bar chart counts filtered crashes
   inside an adjustable straight-line radius around each
   mapped station, with controls for the most-active or least-active end of the

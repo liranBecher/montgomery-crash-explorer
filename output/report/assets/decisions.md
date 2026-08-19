@@ -3,6 +3,26 @@
 This record captures the major data, design, and interaction decisions for the
 Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
 
+## Shared application structure and filters
+
+- The application now has exactly three connected analysis tabs: **Safety
+  Hotspots**, **Fire & Rescue Proximity**, and **Police Breathalyzers**. The
+  former Vehicles & Injuries prototype and its documentation references were
+  removed so the submitted system contains only implemented, data-backed views.
+- A persistent shared sidebar provides the **From** and **To** date filters used
+  by all three tabs. This replaces duplicate per-tab date controls and keeps the
+  active time window consistent when moving between analyses.
+- The default shared date window is the latest five years, bounded by the
+  available crash data.
+- A municipality/area filter was briefly introduced but removed because the
+  incident municipality field is too incomplete to serve as a reliable shared
+  analysis dimension. The shared filter contract therefore currently carries
+  only the date range.
+- **Reset filters** restores the default date window and clears active map,
+  station, and weekday/hour selections. Chart selections remain local to the
+  analysis where they are meaningful; only the date subset is shared across
+  tabs.
+
 ## Shared map language and semantic zoom
 
 ### Common visual system
@@ -11,24 +31,29 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
   three independently designed visuals.
 - They use the same countywide default viewport: latitude `39.12`, longitude
   `-77.13`, zoom `8.6`.
-- The countywide view uses 0.01-degree aggregate grid cells so dense crash
-  patterns remain readable.
-- Aggregate cells use uniform-size circles. Marker size does not encode a
-  quantitative value; **color alone** carries the active map measure.
-- The maps share the same light CARTO basemap, white cell outline, warm
-  sequential low-to-high palette, hover highlighting, and dark selected-cell
-  ring.
+- The countywide view uses fixed 0.01-degree aggregate grid cells so dense crash
+  patterns remain readable and the same spatial unit is used across analyses.
+- Aggregate cells are rendered as geographic **grid tiles** with a `PolygonLayer`.
+  Tile area represents the fixed spatial aggregation unit and does not encode a
+  quantitative value; **fill color alone** carries the active map measure.
+- The maps share the same light CARTO basemap, white tile outline, warm
+  sequential low-to-high palette, hover highlighting, and selected-cell
+  treatment.
 - The warm color scale is recalculated whenever the active filters change. The
   lowest visible value is assigned the light end of the palette and the highest
   visible value the dark end, with the other values distributed between them.
   This improves contrast within the current result set, especially when a
   filter leaves a narrow range of counts.
 - Because the scale's minimum and maximum can change, color is only comparable
-  within the current map state. A dark-red cell might represent 12 crashes in
+  within the current map state. A dark-red tile might represent 12 crashes in
   one filter state and 80 in another; identical shades do not guarantee
   identical counts across tabs or filter states. The legend updates to show the
   current numeric range, so users should consult it after changing a filter
   rather than comparing colors from memory.
+- The selected tile is removed from the hoverable base layer and redrawn as a
+  separate, non-pickable polygon. Its fill becomes nearly transparent while its
+  outline preserves the tile's quantitative color, keeping the selection clear
+  without replacing the encoded value with an unrelated selection color.
 - Legends use the same visual vocabulary for the quantitative gradient and
   selected grid cell. Domain-specific symbols, such as Fire & Rescue station
   crosses and station-radius context, are added without changing the base map
@@ -38,14 +63,14 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
 
 - Selecting a crash grid cell is the standard semantic zoom interaction across
   Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers.
-- In the default state, only aggregate grid cells are shown and the map stays at
+- In the default state, only aggregate grid tiles are shown and the map stays at
   the countywide viewport.
 - Selecting a cell recentres the map on that cell, zooms to street level
-  (`zoom=13`), keeps the selected-cell ring and aggregate context, and reveals
+  (`zoom=13`), keeps the selected-cell outline and aggregate context, and reveals
   the individual crash coordinates belonging to that selected cell.
 - Individual crashes use small circular markers with a subtle white outline,
   fixed pixel sizing, sufficient opacity for overlap, and pickable tooltips.
-  They intentionally do not reuse the large aggregate-cell marker style.
+  They intentionally do not reuse the aggregate-tile style.
 - Incident-marker radius is expressed as the literal `"pixels"` deck.gl unit so
   point size remains stable while zooming and cannot expand into a large
   geographic-radius disk.
@@ -73,15 +98,16 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
   spatial unit and interaction language stay consistent.
 - Users can switch between all classified crashes and a focused
   suspected-serious/fatal mode.
-- The default date window is the latest five years, bounded by the available
-  data.
-- The incomplete 2026 source period is labelled wherever time comparisons may
-  be interpreted.
+- The shared sidebar supplies the active date range; the incomplete 2026 source
+  period is labelled wherever time comparisons may be interpreted.
+- Weather, Surface, and Light can also be filtered locally through the Safety
+  conditions popover. A dedicated **Clear all condition filters** action resets
+  these local category filters without changing the shared date range.
 
 ### Map and semantic drill-down
 
-- Countywide crash concentrations are shown as uniform-size grid-cell circles,
-  with color encoding crash count.
+- Countywide crash concentrations are shown as 0.01-degree grid tiles, with
+  color encoding crash count per tile.
 - Selecting a grid cell uses the shared semantic zoom behavior: the map moves to
   street level, retains the selected-cell context, and reveals the exact crash
   coordinates inside that cell.
@@ -92,28 +118,25 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
 ### Condition fingerprint
 
 - The hotspot fingerprint compares the selected cell with the active county
-  baseline rather than presenting raw local percentages without context.
+  **average** rather than presenting raw local percentages without context.
 - The comparison uses grouped condition families for Weather, Surface, and
   Light.
 - Categories are ordered by county prevalence so the selected hotspot and the
-  baseline remain directly comparable.
+  county average remain directly comparable.
 - Small selected samples are explicitly cautioned because percentages can be
   unstable when the hotspot contains few crashes.
-- The fingerprint uses a ridge-style SVG for each condition family so the visual
-  encoding stays compact while still comparing a selected hotspot against the
-  county baseline.
-- The ridge outline is intentionally a fixed reference: a fully opaque stroke
-  marks the constant benchmark, while the fill opacity inside that outline tracks
-  how different the selected hotspot is from the county pattern.
-- The outline color matches the groove/family color to make cross-family
-  comparison easy without requiring a separate legend to decode the border.
-- The ridge outline was widened so the reference remains legible at small sizes.
-- The central neutral interior was softened away from stark black/gray/white to
-  reduce visual dominance and to keep the focus on the family color and the
-  relative fill opacity.
-- The Light family uses a blue accent to remain visually distinct from the teal
-  Weather and warm orange Surface strokes while still fitting the shared map
-  palette.
+- The fingerprint uses a compact ridge-style SVG with one ridge per condition
+  family. Similarity is encoded as **colored stroke progress along a fixed ridge
+  path**, rather than by changing the ridge's overall thickness or filling the
+  whole shape with variable opacity.
+- The full ridge path acts as the reference extent; the colored portion shows
+  similarity to the active county pattern, with a legend explicitly explaining
+  that encoding.
+- Weather, Surface, and Light retain distinct family accents so the three ridges
+  can be identified quickly without competing with the map's quantitative
+  color scale.
+- The fingerprint is positioned beside the condition comparison charts to keep
+  the main Safety analysis visible with minimal scrolling.
 
 ### Linked crash timing
 
@@ -124,13 +147,15 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
 - Selecting a map cell changes the heatmap geography to that selected cell.
 - Double-clicking the timing heatmap clears its time selection, while the main
   clear action resets both the spatial and time selections.
+- The timing heatmap uses the shared blue-to-purple sequential heatmap palette,
+  keeping ordered magnitude perceptually distinct from the warm map palette.
 
 ### Analytical cautions
 
 - The hotspot view describes recorded crash concentrations and conditions. It
   does not estimate underlying traffic, pedestrian, or cyclist exposure and
   does not establish causal risk.
-- The county comparison includes the selected cell; it is a contextual baseline
+- The county comparison includes the selected cell; it is a contextual average
   rather than a statistically independent control group.
 
 ## Fire & Rescue Proximity
@@ -167,18 +192,17 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
   and Possible Injury. Minor and no-apparent-injury options are intentionally
   omitted from the interface.
 - The map has a minimum cell sample control, with a default of three crashes.
-- Date range and daypart filters apply to the connected Fire & Rescue views.
-- The default date window is the latest five years, bounded by the available
-  data.
+- The shared sidebar date range applies to Fire & Rescue; daypart and severity
+  remain local filters because they are specific to this analysis.
 - The incomplete 2026 source period is labelled wherever time comparisons may
   be interpreted.
 
 ### Map and legends
 
-- Grid cells are mapped as uniform-size circles. **Color alone** encodes the
-  filtered crash count, avoiding overcrowding and competing size encodings.
-- Fire stations use a rescue-cross marker rather than a circle, so they are
-  clearly distinguishable from crash-demand cells.
+- Crash demand is mapped as the same fixed 0.01-degree grid tiles used in the
+  other tabs. **Color alone** encodes the filtered crash count.
+- Fire stations use a rescue-cross marker rather than a grid tile or crash
+  point, so they are clearly distinguishable from crash-demand cells.
 - The map includes an explicit legend for crash-count color, rescue crosses,
   selected cells, and the selected-station radius/incident context.
 - Selecting a station displays its adjustable straight-line radius and the
@@ -195,10 +219,12 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
 
 ### Companion views
 
-- The scatterplot compares median crash-to-nearest-station road distance within
-  each grid cell (x) with filtered crash count (y), with median straight-line
-  distance in the tooltip. It intentionally avoids an arbitrary composite "gap
-  score."
+- The scatterplot compares median crash-to-nearest-station **road distance**
+  within each grid cell (x) with filtered crash count (y), with median
+  straight-line distance retained in the tooltip as secondary context. It
+  intentionally avoids an arbitrary composite "gap score."
+- Median reference lines support quadrant-style comparison while keeping the
+  two underlying measures explicit.
 - The station bar chart ranks stations by the number of filtered crashes inside
   the selected radius. It supports **Most active** and **Least active** views.
 - Each station is counted independently in the bar chart, so a crash can occur
@@ -211,6 +237,8 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
 
 - Map selection details appear in a compact overlay at the map's bottom-left,
   instead of shifting the charts below the map.
+- The map header contains the clear-selection action so the reset control stays
+  visually attached to the visualization it affects.
 - Clicking a station bar selects that station and recentres the map at a
   deliberately moderate zoom level, keeping nearby stations and context in
   view.
@@ -227,6 +255,11 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
 
 ### Analytical cautions
 
+- Road-network distance is a geographic path-length approximation, not travel
+  time. It does not include live traffic, apparatus restrictions, dispatch
+  decisions, staffing, or actual emergency response performance.
+- The Haversine station-radius view remains intentionally straight-line and is
+  not interchangeable with the road-distance scatterplot measure.
 - Geographic proximity cannot establish whether stations are operationally
   redundant or "too close for no reason." That conclusion would require
   information such as apparatus, staffing, service areas, and dispatch data.
@@ -268,9 +301,8 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
 - Users can switch between alcohol-related crash count and alcohol-related
   share. Share uses all geocoded crashes in the same active geography and time
   window as its denominator.
-- Date, included alcohol categories, measure, and minimum all-crashes-per-cell
-  controls apply to the connected views. The default date window is the latest
-  five years, bounded by the available data.
+- The shared sidebar supplies the date range. Included alcohol categories,
+  measure, and minimum all-crashes-per-cell remain local controls.
 - The minimum all-crashes-per-cell control is a reliability/context filter on
   the denominator, not a minimum number of alcohol-related crashes.
 - When a weekday-hour heatmap cell is selected, the map minimum automatically
@@ -279,9 +311,9 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
 
 ### Map and semantic drill-down
 
-- The countywide map aggregates crashes into cells to keep dense patterns
-  readable. Uniform marker size leaves color as the single quantitative map
-  encoding.
+- The countywide map aggregates crashes into the same fixed grid tiles used by
+  the other tabs to keep dense patterns readable. Color is the single
+  quantitative tile encoding.
 - Selecting an aggregate cell follows the shared semantic zoom behavior: the
   map recentres at street level, retains the selected-cell/aggregate context,
   and overlays the exact coordinates of the underlying active alcohol-related
@@ -292,12 +324,13 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
 
 ### Linked time and place exploration
 
-- The weekday-by-hour heatmap reveals recurring timing patterns and supports a
+- The weekday-by-hour view reveals recurring timing patterns and supports a
   selected time window that filters the map.
-- The timing heatmap uses a radial layout because hour of day is periodic:
-  23:00 and 00:00 are adjacent observations rather than unrelated endpoints.
-  Hours are mapped around the circle and weekdays are mapped to concentric
-  rings, aligning the same hour across all seven days on one radial spoke.
+- The timing visualization uses a **radial heatmap** because hour of day is
+  periodic: 23:00 and 00:00 are adjacent observations rather than unrelated
+  endpoints. Hours are mapped around the circle and weekdays are mapped to
+  concentric rings, aligning the same hour across all seven days on one radial
+  spoke.
 - This layout is intended primarily for detecting recurring daily patterns,
   quiet periods, and broad similarities across weekdays. It also provides a
   visually distinct time view while remaining consistent with course guidance
@@ -309,12 +342,12 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
   magnitude. Outer-ring cells are physically larger than inner-ring cells, so
   the chart is not used for precise area comparison. Tooltips expose the exact
   weekday, hour, alcohol-related count, total crash count, and share on demand.
-- Selecting a map cell filters the heatmap to that geography. Selecting a
-  heatmap cell filters the map to that weekday and hour.
+- Selecting a map cell filters the radial heatmap to that geography. Selecting
+  a radial heatmap cell filters the map to that weekday and hour.
 - A single clear action resets both spatial and time selections, and the
   summary text always states whether the current context is countywide or a
   selected cell and time.
-- The heatmap time axis runs from 06:00 through 05:00 so daytime/evening/night
+- The time sequence runs from 06:00 through 05:00 so daytime/evening/night
   patterns read as one continuous daily cycle rather than splitting the night
   at midnight.
 

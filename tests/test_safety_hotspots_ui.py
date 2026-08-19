@@ -52,13 +52,13 @@ class SafetyHotspotsUiTest(unittest.TestCase):
         self.assertEqual(set(fingerprint["family"]), {"Weather", "Surface", "Light"})
         not_recorded = fingerprint[
             fingerprint["category"].eq("Not recorded")
-            & fingerprint["geography"].eq("County baseline")
+            & fingerprint["geography"].eq("County average")
         ]
         self.assertEqual(len(not_recorded), 3)
         county_baseline = fingerprint[
             fingerprint["family"].eq("Weather")
             & fingerprint["category"].eq("Clear")
-            & fingerprint["geography"].eq("County baseline")
+            & fingerprint["geography"].eq("County average")
         ].iloc[0]
         self.assertEqual(county_baseline["share_pct"], 50)
 
@@ -66,7 +66,7 @@ class SafetyHotspotsUiTest(unittest.TestCase):
         self.assertEqual(set(baseline_only["family"]), {"Weather", "Surface", "Light"})
         self.assertEqual(
             baseline_only[baseline_only["family"].eq("Weather") & baseline_only["category"].eq("Clear")]["geography"].unique().tolist(),
-            ["County baseline"],
+            ["County average"],
         )
 
         timing = aggregate_timing(self.crashes, "Countywide", "Jan 1–Jan 31")
@@ -111,7 +111,7 @@ class SafetyHotspotsUiTest(unittest.TestCase):
             (39.12, -77.13, 8.6),
         )
         self.assertEqual(heatmap["params"][0]["name"], "safety_time_pick")
-        self.assertEqual(len(comparison["vconcat"]), 3)
+        self.assertEqual(len(comparison["hconcat"]), 3)
         self.assertEqual(
             _map_cell_from_event(
                 {"selection": {"objects": {"safety-cells": [{"cell_id": "39.00:-77.10"}]}}}

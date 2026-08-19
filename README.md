@@ -10,24 +10,23 @@ Interactive data-visualization course project built with Python and Streamlit.
 ## Research question
 
 Where and when do crashes concentrate in Montgomery County, and which
-conditions, response context, alcohol-related patterns, and vehicle
-characteristics distinguish those crashes and their injury severity?
+recorded conditions, injury severity, fire-station proximity, and
+alcohol-related patterns distinguish those concentrations?
 
 The Safety Hotspots tab is the primary overview. The other tabs provide focused
-follow-up analyses of responder coverage, alcohol-related patterns, and vehicle
-and injury characteristics.
+follow-up analyses of fire-station proximity and alcohol-related patterns.
 
 ## Current status
 
-| Implemented | Not implemented yet |
+| Implemented | Remaining work |
 | --- | --- |
-| Public Streamlit interface plus Safety Hotspots, Fire & Rescue, and Police Breathalyzers analyses | Data-backed Vehicles & Injuries tab |
+| Public Streamlit interface plus Safety Hotspots, Fire & Rescue, and Police Breathalyzers analyses | Final validated findings and recommendations |
 | Three connected analyses with responsive maps and charts | Shared cross-tab filters and selections |
-| Safety, Fire & Rescue, and alcohol filters with linked chart selections | Final validated findings and recommendations |
+| Safety, Fire & Rescue, and alcohol filters with linked chart selections | Accessibility, browser, performance, and comprehension evaluation |
 | Automated preprocessing and interface contracts | — |
 
-The Safety Hotspots, Fire & Rescue, and Police Breathalyzers tabs are connected
-to processed data. Vehicles & Injuries remains an interface prototype.
+All three tabs are connected to processed data and provide local filters and
+linked selections.
 
 ## Run locally
 
@@ -50,12 +49,11 @@ Run the current automated test with:
 python -m unittest discover -s tests -v
 ```
 
-## Planned views
+## Application views
 
 1. Safety hotspots by time, place, weather, road type, and light conditions
 2. Serious/fatal crash proximity to mapped fire-station locations
 3. Priority locations and times for police breathalyzer alcohol-level enforcement
-4. Vehicle make/age and driver injury severity
 
 Detailed encodings and linking behavior are specified in
 [DESIGN_SPEC.md](./DESIGN_SPEC.md).
@@ -64,8 +62,8 @@ Detailed encodings and linking behavior are specified in
 
 ```text
 app.py                    # Streamlit entry point
-ui/components.py          # Shared header, filters, guide, and placeholder cards
-ui/views.py               # View routing and remaining placeholders
+ui/components.py          # Shared header, sidebar, and presentation helpers
+ui/views.py               # Three-tab view routing
 ui/safety_hotspots.py     # Connected hotspot map, fingerprint, and timing views
 ui/fire_rescue.py         # Connected Fire & Rescue charts and interactions
 ui/police_breathalyzers.py # Connected alcohol map, timing, and interactions
@@ -94,12 +92,6 @@ output/report/            # Editable report artifact
 | PyDeck | Linked crash hotspot and station-location maps |
 | HTML and CSS | Accessible structure, presentation, and responsive layout |
 | GitHub | Source control and the public repository used by Streamlit Community Cloud |
-
-### Declared for the data and visualization phase
-
-| Library | Intended use |
-| --- | --- |
-| Plotly Express / Graph Objects | Interactive timelines, distributions, comparisons, and linked chart selections |
 
 GeoPandas and Shapely are possible later additions for validated spatial work;
 they are not current project dependencies.
@@ -134,11 +126,9 @@ Python 3.12 and keep the app public for course submission.
 
 ## Current limitations
 
-- The safety and vehicle views remain interface placeholders.
 - Fire-station proximity is straight-line distance, not travel time or measured
   emergency response performance.
 - The alcohol view describes historical recorded patterns; it does not measure
   blood alcohol level or establish where enforcement should occur.
-- Planned vehicle-age measures still require definitions and validation.
 - Accessibility, browser compatibility, performance, and user comprehension
   have not yet been evaluated with live visualizations.

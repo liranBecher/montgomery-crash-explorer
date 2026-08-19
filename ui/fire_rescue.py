@@ -276,6 +276,7 @@ def build_map(
         / max(demand["crash_count"].max() - demand["crash_count"].min(), 1)
     )
     demand["fill_color"] = colors.map_fill_colors(color_position)
+    demand["original_fill_color"] = demand["fill_color"]
     demand["title"] = "Grid cell " + demand["cell_id"]
     demand["line_1"] = demand["crash_count"].map(
         lambda count: f"Filtered crashes: {count}"

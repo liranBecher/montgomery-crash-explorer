@@ -7,10 +7,10 @@ findings are implemented.
 ## Primary research question
 
 Where and when do crashes concentrate in Montgomery County, and which
-conditions, response context, alcohol-related patterns, and vehicle
-characteristics distinguish those crashes and their injury severity?
+recorded conditions, injury severity, fire-station proximity, and
+alcohol-related patterns distinguish those concentrations?
 
-The four application tabs answer complementary parts of this question. The
+The three application tabs answer complementary parts of this question. The
 Safety Hotspots tab is the overview and entry point; the other tabs provide
 focused follow-up analyses.
 
@@ -97,15 +97,6 @@ selection will restore the countywide overview.
   before the view can make recommendations. Until then, the view describes
   historical recorded patterns only.
 
-### 4. Vehicles and Injuries
-
-- Age comparison: 100% stacked bars only if injury categories form a complete
-  distribution within each vehicle-age group; otherwise use grouped bars.
-- Make-by-age comparison: a matrix of serious-injury share with visible sample
-  size and a minimum-sample rule.
-- Vehicle-age bands, injury grouping, make normalization, and minimum sample
-  size remain undecided until preprocessing is complete.
-
 ## Brushing and linking behavior
 
 | User action | Views updated |
@@ -115,11 +106,10 @@ selection will restore the countywide overview.
 | Select a time cell or interval | Active map, comparison view, and selection summary |
 | Select a responder-demand area | Coverage-gap detail and selection summary |
 | Select an alcohol-related area or time cell | Alcohol map, timing view, and selection summary |
-| Select a vehicle-age group or matrix cell | Vehicle comparison, injury distribution, and selection summary |
 | Clear selection | Restore the shared-filter overview in the active tab |
 
-The Streamlit prototype currently describes these interactions but does not
-implement chart selection, brushing, or linking.
+The Streamlit implementation supports chart selection and linking within each
+tab. Shared cross-tab filters and selections remain future work.
 
 ## Visualization correctness constraints
 

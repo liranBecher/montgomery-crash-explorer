@@ -33,7 +33,7 @@ def render_app_header() -> None:
 def render_sidebar() -> None:
     with st.sidebar:
         st.header("Shared filters")
-        st.caption("Shared controls will activate as the remaining view is connected. Connected analyses currently use local controls.")
+        st.caption("The three connected analyses currently use local controls; shared cross-tab controls are future work.")
         st.date_input("From", value=None, disabled=True, key="filter_start_date")
         st.date_input("To", value=None, disabled=True, key="filter_end_date")
         st.selectbox(
@@ -48,7 +48,7 @@ def render_sidebar() -> None:
         st.markdown("**Current selection**")
         st.caption("No shared selection. Connected views show their local selection details.")
         st.button("Clear selection", disabled=True, use_container_width=True)
-        st.caption("Shared selections will activate as the remaining views are connected.")
+        st.caption("Shared cross-tab selections are future work.")
 
 
 def render_view_header(title: str, description: str, control_label: str, key: str) -> None:

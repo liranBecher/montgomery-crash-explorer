@@ -269,6 +269,21 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
 
 - The weekday-by-hour heatmap reveals recurring timing patterns and supports a
   selected time window that filters the map.
+- The timing heatmap uses a radial layout because hour of day is periodic:
+  23:00 and 00:00 are adjacent observations rather than unrelated endpoints.
+  Hours are mapped around the circle and weekdays are mapped to concentric
+  rings, aligning the same hour across all seven days on one radial spoke.
+- This layout is intended primarily for detecting recurring daily patterns,
+  quiet periods, and broad similarities across weekdays. It also provides a
+  visually distinct time view while remaining consistent with course guidance
+  that cyclical time may be represented circularly.
+- The radial layout is a deliberate exception to the usual left-to-right rule
+  for linear time axes. It preserves the daily cycle, but it does not make
+  Sunday and Monday spatially adjacent because weekdays are concentric rings.
+- Color is the quantitative encoding; ring area is not intended to encode
+  magnitude. Outer-ring cells are physically larger than inner-ring cells, so
+  the chart is not used for precise area comparison. Tooltips expose the exact
+  weekday, hour, alcohol-related count, total crash count, and share on demand.
 - Selecting a map cell filters the heatmap to that geography. Selecting a
   heatmap cell filters the map to that weekday and hour.
 - A single clear action resets both spatial and time selections, and the

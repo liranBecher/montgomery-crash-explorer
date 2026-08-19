@@ -175,7 +175,6 @@ class LayoutPrototypeTest(unittest.TestCase):
                 "Safety Hotspots",
                 "Fire & Rescue Proximity",
                 "Police Breathalyzers",
-                "Vehicles & Injuries",
             ],
         )
         dates = {widget.label: widget for widget in app.date_input}
@@ -215,9 +214,9 @@ class LayoutPrototypeTest(unittest.TestCase):
             [button.label for button in app.button],
             [
                 "Clear selection",
-                "Clear hotspot selection",
-                "Clear map selection",
-                "Clear alcohol selection",
+                "Clear selection",
+                "Clear selection",
+                "Clear selection",
             ],
         )
         self.assertTrue(all(button.disabled for button in app.button))
@@ -239,20 +238,16 @@ class LayoutPrototypeTest(unittest.TestCase):
             + [heading.value for heading in app.subheader]
         )
         for expected_text in (
-            "Safety, Fire &amp; Rescue, and alcohol analyses connected",
             "Crash hotspots by grid cell",
             "Hotspot fingerprint",
             "Crash timing",
             "Where are crashes farther from mapped fire stations?",
             "Map legend",
-            "Filtered crash count: color",
+            "Filtered crash count per grid cell: color",
             "Mapped fire station (rescue cross)",
             "Scatterplot legend",
             "Visible-cell medians",
             "Alcohol-related crashes by grid cell",
-            "Injury distribution by vehicle age",
-            "Planned interaction:",
-            "No visualization is rendered",
         ):
             with self.subTest(expected_text=expected_text):
                 self.assertIn(expected_text, rendered_text)

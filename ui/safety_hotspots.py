@@ -803,7 +803,7 @@ def render_safety_hotspots_view(shared_filters: SharedFilters) -> None:
         """
         <div class="mce-view-heading">
             <h2>Where, when, and under which conditions do crashes concentrate?</h2>
-            <p>Select a roughly 1 km grid cell to compare its recorded conditions with the county average and inspect its crash timing.</p>
+            <p>Select a 1 km grid cell to compare its recorded conditions with the county average and inspect its crash timing.</p>
         </div>
         """,
         unsafe_allow_html=True,

@@ -152,7 +152,8 @@ class SafetyHotspotsUiTest(unittest.TestCase):
         self.assertIn("mce-fingerprint-ridge", selected_svg)
         self.assertIn('pathLength="1"', selected_svg)
         self.assertIn("stroke-dasharray=", selected_svg)
-        self.assertIn("Colored area — similarity to county", selected_svg)
+        self.assertIn("Colored length = similarity; full ridge = 100%.", selected_svg)
+        self.assertNotIn("ridge-outline", selected_svg)
         self.assertNotIn("--family-opacity", selected_svg)
         self.assertEqual(selected_svg.count('class="mce-fingerprint-ridge ridge-fill"'), 3)
 

@@ -23,7 +23,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class LayoutPrototypeTest(unittest.TestCase):
-    def test_shared_filters_apply_dates_and_area_report_numbers(self) -> None:
+    def test_shared_filters_apply_dates(self) -> None:
         crashes = pd.DataFrame(
             {
                 "report_number": ["A", "B", "C"],
@@ -32,13 +32,11 @@ class LayoutPrototypeTest(unittest.TestCase):
                 ),
             }
         )
-        filters = SharedFilters(
-            date(2025, 1, 1), date(2025, 12, 31), "Rockville", frozenset({"B", "C"})
-        )
+        filters = SharedFilters(date(2025, 1, 1), date(2025, 12, 31))
 
         self.assertEqual(
             apply_shared_filters(crashes, filters)["report_number"].tolist(),
-            ["B"],
+            ["A", "B"],
         )
 
     def test_date_presets_shift_to_the_last_available_date(self) -> None:
@@ -242,7 +240,6 @@ class LayoutPrototypeTest(unittest.TestCase):
         app = AppTest.from_file(str(PROJECT_ROOT / "app.py"))
         app.session_state["filter_start_date"] = None
         app.session_state["filter_end_date"] = None
-        app.session_state["filter_area"] = None
         app.run(timeout=15)
 
         self.assertFalse(app.exception)
@@ -259,8 +256,6 @@ class LayoutPrototypeTest(unittest.TestCase):
         self.assertFalse(dates["To"].disabled)
         self.assertEqual(set(dates), {"From", "To"})
         selectboxes = {widget.label: widget for widget in app.selectbox}
-        self.assertFalse(selectboxes["Area"].disabled)
-        self.assertIn("Rockville", selectboxes["Area"].options)
         self.assertFalse(selectboxes["Time of day"].disabled)
         self.assertEqual(selectboxes["Station activity"].value, "Most active")
         sliders = {widget.label: widget for widget in app.slider}
@@ -292,6 +287,7 @@ class LayoutPrototypeTest(unittest.TestCase):
             [button.label for button in app.button],
             [
                 "Reset filters",
+                "Clear all filters",
                 "Clear selection",
                 "Clear selection",
                 "Clear selection",
@@ -314,15 +310,6 @@ class LayoutPrototypeTest(unittest.TestCase):
             any("Bottom 15 mapped stations" in caption.value for caption in app.caption)
         )
 
-        next(widget for widget in app.selectbox if widget.label == "Time of day").set_value("All day")
-        next(widget for widget in app.selectbox if widget.label == "Area").set_value("Rockville")
-        app.run(timeout=15)
-        self.assertFalse(app.exception)
-        self.assertEqual(
-            next(widget for widget in app.selectbox if widget.label == "Area").value,
-            "Rockville",
-        )
-
         rendered_text = "\n".join(
             [markdown.value for markdown in app.markdown]
             + [heading.value for heading in app.subheader]
@@ -336,7 +323,7 @@ class LayoutPrototypeTest(unittest.TestCase):
             "Filtered crash count per grid cell: color",
             "Mapped fire station (rescue cross)",
             "Scatterplot legend",
-            "Visible-cell medians",
+            "Median reference lines across visible cells",
             "Alcohol-related crashes by grid cell",
         ):
             with self.subTest(expected_text=expected_text):

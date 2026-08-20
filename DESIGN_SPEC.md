@@ -29,8 +29,8 @@ yet been conducted.
 The interface follows Shneiderman's mantra:
 
 1. **Overview first:** begin with the countywide Safety Hotspots map.
-2. **Zoom and filter:** narrow the view by date, area, severity, map extent, or
-   a chart selection.
+2. **Zoom and filter:** narrow the view by date, analysis-specific filters, map
+   extent, or a chart selection.
 3. **Details on demand:** reveal exact counts, percentages, sample sizes, and
    record-level fields through tooltips or a focused details panel.
 
@@ -48,7 +48,7 @@ selection will restore the countywide overview.
   after coordinate quality and density are inspected.
 - Encodings: longitude and latitude to position; crash count to size or color;
   severity to a filtered category or a palette of no more than six categories.
-- Details on demand: location/area, crash count, severity composition, selected
+- Details on demand: grid cell/location, crash count, severity composition, selected
   date range, and the geographic aggregation used.
 
 **Hotspot fingerprint**
@@ -57,7 +57,7 @@ selection will restore the countywide overview.
   reference distribution.
 - Marks: grouped horizontal bars.
 - Encodings: condition category on the vertical axis; share of crashes on the
-  horizontal axis; two colors for selected area and county reference.
+  horizontal axis; two colors for selected hotspot and county reference.
 - Correctness: the percentage axis starts at zero; categories are sorted by a
   stated rule; sample sizes remain visible.
 
@@ -93,7 +93,7 @@ selection will restore the countywide overview.
 
 ### 3. Police Breathalyzers
 
-- Main map: recorded alcohol-related crash count and share by area.
+- Main map: recorded alcohol-related crash count and share by grid cell.
 - Timing view: day-of-week by hour heatmap using a left-to-right time axis.
 - The alcohol-related definition and any prioritization rule must be documented
   before the view can make recommendations. Until then, the view describes
@@ -103,15 +103,15 @@ selection will restore the countywide overview.
 
 | User action | Views updated |
 | --- | --- |
-| Change a shared date, area, or severity filter | Every visualization in the active tab and the selection summary |
+| Change a shared date or analysis-specific filter | Every visualization in the active tab and the selection summary |
 | Select a hotspot or map area | Hotspot fingerprint, crash timing, and selection summary |
 | Select a time cell or interval | Active map, comparison view, and selection summary |
 | Select a responder-demand area | Coverage-gap detail and selection summary |
 | Select an alcohol-related area or time cell | Alcohol map, timing view, and selection summary |
 | Clear selection | Restore the shared-filter overview in the active tab |
 
-The Streamlit implementation supports shared date and municipality filters plus
-chart selection and linking within each tab. Shared cross-tab chart selections
+The Streamlit implementation supports shared date filters plus chart selection
+and linking within each tab. Shared cross-tab chart selections
 remain future work.
 
 ## Visualization correctness constraints

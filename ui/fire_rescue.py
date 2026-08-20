@@ -47,6 +47,8 @@ SEVERITY_SHORT = {
     "No Apparent Injury": "No apparent",
 }
 EARTH_RADIUS_KM = 6371.0088
+KM_PER_MILE = 1.609344
+RAND_ISO_FOUR_MINUTE_KM = (4 - 0.65) / 1.7 * KM_PER_MILE
 
 
 def _bound_date_range(
@@ -105,6 +107,7 @@ def aggregate_cells(
             common_roads=pd.Series(dtype="string"),
             median_crash_station_distance_km=pd.Series(dtype="float64"),
             median_crash_road_distance_km=pd.Series(dtype="float64"),
+            approx_travel_time_min=pd.Series(dtype="float64"),
         )
 
     working = filtered.assign(
@@ -158,6 +161,11 @@ def aggregate_cells(
         .merge(breakdowns, on="cell_id", how="left", validate="one_to_one")
         .merge(roads, on="cell_id", how="left", validate="one_to_one")
         .fillna({"common_roads": "Not recorded"})
+        .assign(
+            approx_travel_time_min=lambda frame: (
+                0.65 + 1.7 * frame["median_crash_road_distance_km"] / KM_PER_MILE
+            )
+        )
     )
 
 
@@ -305,6 +313,9 @@ def build_map(
         ),
         axis=1,
     )
+    demand["line_4"] = demand["approx_travel_time_min"].map(
+        lambda value: f"Approx. travel time: {value:.1f} min"
+    )
     if selected_cell:
         base_demand = demand[
             ~demand["cell_id"].eq(selected_cell)
@@ -412,7 +423,7 @@ def build_map(
         map_provider="carto",
         map_style=pdk.map_styles.CARTO_LIGHT,
         tooltip={
-            "html": "<b>{title}</b><br>{line_1}<br>{line_2}<br>{line_3}"
+            "html": "<b>{title}</b><br>{line_1}<br>{line_2}<br>{line_3}<br>{line_4}"
         },
     )
 
@@ -464,6 +475,11 @@ def build_gap_scatter(cells: pd.DataFrame, selected_cell: str | None) -> alt.Cha
                     title="Median straight-line distance (km)",
                     format=".2f",
                 ),
+                alt.Tooltip(
+                    "approx_travel_time_min:Q",
+                    title="Approx. travel time (min)",
+                    format=".1f",
+                ),
                 alt.Tooltip("crash_count:Q", title="Filtered crashes"),
                 alt.Tooltip("severity_breakdown:N", title="Severity breakdown"),
                 alt.Tooltip("serious_count:Q", title="Serious"),
@@ -481,7 +497,25 @@ def build_gap_scatter(cells: pd.DataFrame, selected_cell: str | None) -> alt.Cha
     )
     vertical = alt.Chart(medians).mark_rule(color="#8c99a5", strokeDash=[4, 4]).encode(x="distance:Q")
     horizontal = alt.Chart(medians).mark_rule(color="#8c99a5", strokeDash=[4, 4]).encode(y="count:Q")
-    return (points + vertical + horizontal).properties(height=440)
+    four_minute = (
+        alt.Chart(
+            pd.DataFrame(
+                {
+                    "distance": [RAND_ISO_FOUR_MINUTE_KM],
+                    "context": ["RAND/ISO approx. 4 minutes"],
+                }
+            )
+        )
+        .mark_rule(color="#087f78", strokeDash=[10, 4], strokeWidth=2)
+        .encode(
+            x="distance:Q",
+            tooltip=[
+                alt.Tooltip("context:N", title="Reference"),
+                alt.Tooltip("distance:Q", title="Road distance (km)", format=".2f"),
+            ],
+        )
+    )
+    return (points + vertical + horizontal + four_minute).properties(height=440)
 
 
 def build_station_radius_bar(
@@ -601,6 +635,10 @@ def render_scatter_legend() -> None:
             <span class="mce-legend-item">
                 <span class="mce-legend-line" aria-hidden="true"></span>
                 Median reference lines across visible cells
+            </span>
+            <span class="mce-legend-item">
+                <span class="mce-legend-line" aria-hidden="true" style="border-top:3px dashed #087f78"></span>
+                RAND/ISO approx. 4 minutes (3.17 km)
             </span>
         </section>
         """,
@@ -808,9 +846,12 @@ def render_fire_rescue_visuals(
             selection_mode="cell_pick",
         )
         st.caption(
-            "Context: NFPA 1710 uses a 4-minute first-engine travel-time "
-            "benchmark. Road and straight-line distances here are geographic "
-            "proximity measures and should not be converted directly to response time."
+            "*Approx. travel time uses the RAND/ISO model T = 0.65 + 1.7D, "
+            "where D is median road distance in miles.* "
+            "[(i)](https://www.mtas.tennessee.edu/reference/estimating-travel-time-fire-apparatus)"
+            "\n\n**NFPA 1710 includes a 4-minute first-responder travel-time "
+            "objective in relevant fire and EMS contexts.** "
+            "[(i)](https://www.nfpa.org/api/files?path=%2Ffiles%2FAboutTheCodes%2F1710%2F1710_A2019_FAC_AAA_FRReport.pdf)"
         )
 
     st.subheader(

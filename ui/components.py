@@ -15,14 +15,9 @@ SHARED_CRASHES_FILE = (
     / "police-breathalyzers"
     / "alcohol_crashes.parquet"
 )
-ALL_AREAS = "All Montgomery County"
-
-
 class SharedFilters(NamedTuple):
     start_date: date
     end_date: date
-    area: str
-    report_numbers: frozenset[str] | None
 
 
 @st.cache_data
@@ -32,12 +27,9 @@ def _load_shared_filter_data() -> pd.DataFrame:
 
 def apply_shared_filters(crashes: pd.DataFrame, filters: SharedFilters) -> pd.DataFrame:
     """Apply the persistent sidebar subset to any crash dataset."""
-    selected = crashes[
+    return crashes[
         crashes["crash_datetime"].dt.date.between(filters.start_date, filters.end_date)
     ]
-    if filters.report_numbers is not None:
-        selected = selected[selected["report_number"].isin(filters.report_numbers)]
-    return selected
 
 
 def _reset_shared_filters(start_date: date, end_date: date) -> None:
@@ -105,7 +97,7 @@ def render_sidebar() -> SharedFilters:
             args=(default_start_date, maximum_date),
         )
 
-    return SharedFilters(start_date, end_date, ALL_AREAS, None)
+    return SharedFilters(start_date, end_date)
 
 
 def render_view_header(title: str, description: str, control_label: str, key: str) -> None:

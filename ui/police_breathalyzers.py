@@ -356,13 +356,16 @@ def build_heatmap(
 def render_legend(cells: pd.DataFrame, measure: str) -> None:
     """Render the map's measure and selection legend."""
     value_column, value_label = MAP_MEASURES[measure]
-    minimum, maximum = cells[value_column].min(), cells[value_column].max()
-    formatted = f"{minimum:.1f}–{maximum:.1f}" if value_column.endswith("pct") else f"{int(minimum)}–{int(maximum)}"
+    minimum, maximum = (
+        f"{value:.1f}" if value_column.endswith("pct") else str(int(value))
+        for value in (cells[value_column].min(), cells[value_column].max())
+    )
+    formatted = f"{minimum}–{maximum}"
     st.markdown(
         f"""
         <section class="mce-viz-legend" aria-label="Alcohol map legend">
             <strong>Map legend</strong>
-            <span class="mce-legend-item"><span class="mce-legend-gradient" aria-hidden="true" style="width: 80px;">{maximum}</span>{escape(value_label)} per grid cell: {formatted}</span>
+            <span class="mce-legend-item">{minimum}<span class="mce-legend-gradient" aria-hidden="true" style="width: 80px;"></span>{maximum} {escape(value_label)} per grid cell: {formatted}</span>
             <span class="mce-legend-item"><span class="mce-legend-ring" aria-hidden="true"></span>Selected grid cell</span>
         </section>
         """,

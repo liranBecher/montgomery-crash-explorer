@@ -10,7 +10,6 @@ import pandas as pd
 import pydeck as pdk
 import streamlit as st
 from .components import SharedFilters, apply_shared_filters
-import streamlit.components.v1 as components
 
 from . import colors
 from .map_layers import (
@@ -547,7 +546,6 @@ def build_hotspot_signature_svg(signature_scores: dict, selection_summary: dict 
             for item in details["largest_differences"]
         ) or "<li>No category-level difference</li>"
         paths_html = "".join(
-            f'<path class="ridge-outline" d="{path}" />'
             f'<path class="ridge-background" d="{path}" />'
             f'<path class="mce-fingerprint-ridge ridge-fill" d="{path}" pathLength="1" '
             f'stroke-dasharray="{similarity:.3f} 1" />'
@@ -613,31 +611,23 @@ def build_hotspot_signature_svg(signature_scores: dict, selection_summary: dict 
             .ridge-group .ridge-fill {{
                 fill: none;
                 stroke: var(--family-color);
-                stroke-width: 7;
+                stroke-width: 8;
                 stroke-linecap: round;
                 stroke-linejoin: round;
-                transition: filter .15s ease;
-            }}
-            .ridge-group .ridge-outline {{
-                fill: none;
-                stroke: var(--family-color);
-                stroke-width: 11;
-                stroke-linejoin: round;
-                stroke-linecap: round;
                 transition: filter .15s ease;
             }}
             .ridge-group .ridge-background {{
                 fill: none;
-                stroke: #f4f7f9;
-                stroke-width: 7;
+                stroke: #cfd7dc;
+                stroke-width: 8;
                 stroke-linejoin: round;
                 stroke-linecap: round;
             }}
             .hit-area {{
                 fill: transparent; stroke: transparent; stroke-width: 16px; pointer-events: all;
             }}
-            .ridge-group:hover :is(.ridge-fill,.ridge-outline),
-            .ridge-group:focus :is(.ridge-fill,.ridge-outline) {{
+            .ridge-group:hover .ridge-fill,
+            .ridge-group:focus .ridge-fill {{
                 filter: drop-shadow(0 0 2px rgba(20,32,43,.28));
             }}
             svg:has(.ridge-group:hover) .ridge-group:not(:hover) .ridge-fill,
@@ -649,9 +639,9 @@ def build_hotspot_signature_svg(signature_scores: dict, selection_summary: dict 
             .card:has(.light-target:is(:hover,:focus)) .ridge-group:not(.light) .ridge-fill {{
                 filter: grayscale(.8) brightness(1.25);
             }}
-            .card:has(.weather-target:is(:hover,:focus)) .weather :is(.ridge-fill,.ridge-outline),
-            .card:has(.surface-target:is(:hover,:focus)) .surface :is(.ridge-fill,.ridge-outline),
-            .card:has(.light-target:is(:hover,:focus)) .light :is(.ridge-fill,.ridge-outline) {{
+            .card:has(.weather-target:is(:hover,:focus)) .weather .ridge-fill,
+            .card:has(.surface-target:is(:hover,:focus)) .surface .ridge-fill,
+            .card:has(.light-target:is(:hover,:focus)) .light .ridge-fill {{
                 filter: drop-shadow(0 0 2px rgba(20,32,43,.28));
                 cursor: help; outline: none;
             }}
@@ -675,13 +665,12 @@ def build_hotspot_signature_svg(signature_scores: dict, selection_summary: dict 
             }}
             .legend-row {{ display: flex; align-items: center; gap: 7px; min-width: 0; }}
             .area-key {{
-                position: relative; width: 28px; height: 15px; flex: 0 0 auto;
-                overflow: hidden; border: 2px solid #a8b5a9; border-radius: 2px;
+                position: relative; width: 28px; height: 8px; flex: 0 0 auto;
+                overflow: hidden; border-radius: 999px; background: #cfd7dc;
             }}
             .area-key::after {{
-                content: ""; position: absolute; inset: 0 auto 0 0; width: 65%; background: #a8b5a9;
+                content: ""; position: absolute; inset: 0 auto 0 0; width: 65%; background: #2f8f88;
             }}
-            .outline-key::after {{ display: none; }}
             .zone {{
                 min-width: 51px; padding: 2px 5px; border: 1px solid #9db1bb;
                 border-radius: 999px; color: #5d6b78; font-size: 9px;
@@ -717,8 +706,7 @@ def build_hotspot_signature_svg(signature_scores: dict, selection_summary: dict 
                 </div>
                 <div class="legend" aria-label="Fingerprint legend">
                     {''.join(tooltips)}
-                    <div class="legend-row"><span class="area-key"></span><span>Colored area — similarity to county</span></div>
-                    <div class="legend-row"><span class="area-key outline-key"></span><span>Outline — fixed reference</span></div>
+                    <div class="legend-row"><span class="area-key"></span><span>Colored length = similarity; full ridge = 100%.</span></div>
                     <div class="legend-row family-target weather-target" tabindex="0"><span class="family-swatch" style="--swatch-color:{family_colors['Weather']}"></span><span>Weather · {1 - signature_scores['families']['Weather']['distance']:.1%} similar</span></div>
                     <div class="legend-row family-target surface-target" tabindex="0"><span class="family-swatch" style="--swatch-color:{family_colors['Surface']}"></span><span>Surface · {1 - signature_scores['families']['Surface']['distance']:.1%} similar</span></div>
                     <div class="legend-row family-target light-target" tabindex="0"><span class="family-swatch" style="--swatch-color:{family_colors['Light']}"></span><span>Light · {1 - signature_scores['families']['Light']['distance']:.1%} similar</span></div>
@@ -925,7 +913,7 @@ def render_safety_hotspots_visuals(
     with analysis_column:
         _render_section_title(
             "Hotspot fingerprint",
-            "The fingerprint summarizes how the selected hotspot differs from the county average. More filled zones are more similar; hover a ridge or legend item for details.",
+            "The fingerprint summarizes how the selected hotspot differs from the county average. Colored length shows similarity; a full ridge means 100%. Hover a ridge or legend item for details.",
         )
 
         selection_summary = None
@@ -940,13 +928,12 @@ def render_safety_hotspots_visuals(
                 "common_roads": str(row["common_roads"]),
             }
 
-        components.html(
+        st.iframe(
             build_hotspot_signature_svg(
                 calculate_signature_scores(fingerprint, selected_cell),
                 selection_summary,
             ),
             height=240,
-            scrolling=False,
         )
 
         st.markdown('<hr class="mce-safety-divider">', unsafe_allow_html=True)

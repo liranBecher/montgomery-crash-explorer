@@ -3,6 +3,16 @@
 This record captures the major data, design, and interaction decisions for the
 Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
 
+## Record scope and provenance
+
+- Reconciled on 2026-08-20 against committed implementation through `387b73a`.
+- The review includes the agent-host session checkpoint ranges
+  `beb043c..23722dc`, `f562e8e..ba949d8`, and `e8d427a..9bb1792`, plus the
+  subsequent named implementation commits through the reconciliation point.
+- This is a decision record rather than a commit-by-commit changelog: session
+  work is recorded below when it changed the shipped data meaning, visual
+  encoding, interaction, layout, or analytical caveats.
+
 ## Shared application structure and filters
 
 - The application now has exactly three connected analysis tabs: **Safety
@@ -225,13 +235,23 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
   intentionally avoids an arbitrary composite "gap score."
 - Median reference lines support quadrant-style comparison while keeping the
   two underlying measures explicit.
+- Map-cell and scatterplot tooltips also show an **approximate apparatus travel
+  time** calculated from median road distance with the RAND/ISO model
+  `T = 0.65 + 1.7D`, where `T` is minutes and `D` is road distance in miles.
+  The model and assumptions are sourced from the [University of Tennessee
+  MTAS travel-time reference](https://www.mtas.tennessee.edu/reference/estimating-travel-time-fire-apparatus).
+- A teal long-dashed vertical line marks the modelled four-minute point at
+  approximately **3.17 km** on the scatterplot's road-distance axis. It is
+  visually distinct from the grey median reference lines and is presented as
+  context only, not as a cap, pass/fail threshold, or good/bad classification.
 - The station bar chart ranks stations by the number of filtered crashes inside
   the selected radius. It supports **Most active** and **Least active** views.
 - Each station is counted independently in the bar chart, so a crash can occur
   in more than one station radius; this is disclosed in the chart caption.
-- The NFPA 1710 four-minute first-engine benchmark is presented only as context
-  for why fire-service standards are expressed in time. Neither road distance
-  nor straight-line distance is converted into or presented as response time.
+- [NFPA 1710](https://www.nfpa.org/api/files?path=%2Ffiles%2FAboutTheCodes%2F1710%2F1710_A2019_FAC_AAA_FRReport.pdf)
+  includes four-minute first-responder travel-time objectives in relevant fire
+  and EMS contexts. The interface cites this only as planning context; it does
+  not claim that every recorded crash is governed by that objective.
 
 ### Interaction decisions
 
@@ -255,9 +275,10 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
 
 ### Analytical cautions
 
-- Road-network distance is a geographic path-length approximation, not travel
-  time. It does not include live traffic, apparatus restrictions, dispatch
-  decisions, staffing, or actual emergency response performance.
+- Road-network distance remains the primary geographic measure. The derived
+  RAND/ISO value is a modelled estimate, not observed response time, and does
+  not include live traffic, apparatus restrictions, dispatch decisions,
+  staffing, turnout, availability, or actual emergency response performance.
 - The Haversine station-radius view remains intentionally straight-line and is
   not interchangeable with the road-distance scatterplot measure.
 - Geographic proximity cannot establish whether stations are operationally
@@ -309,6 +330,28 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
   drops to one crash per cell. A narrow time slice should not disappear merely
   because it no longer meets the broader countywide sample threshold.
 
+### Final map-measure decision
+
+- The final map should use **alcohol-related crash count as its only color
+  measure**; the current count/share switch is therefore slated for removal.
+- A share map can be misleading when denominators are small. For example, one
+  alcohol-related crash among one total crash produces a 100% share and could
+  appear more important than a cell containing many more alcohol-related
+  crashes among a larger number of total crashes.
+- The map's primary question is where recorded alcohol-related crashes
+  concentrate, so color should answer that question directly: a darker cell
+  means more alcohol-related crashes. Total crash count and alcohol-related
+  share remain useful supporting context in the tooltip but do not control the
+  tile color.
+- Cells with zero selected alcohol-related crashes are intentionally omitted
+  from this count map to avoid adding visually irrelevant tiles. This is
+  appropriate for a concentration map; it would not be appropriate for a share
+  map, where a valid 0% cell is meaningful comparative evidence.
+- If a share view is revisited later, it should retain eligible 0% cells, use a
+  clearly differentiated title and legend, and require a stronger denominator
+  threshold (approximately 10–20 total crashes) so sparse cells do not dominate
+  the visual interpretation.
+
 ### Map and semantic drill-down
 
 - The countywide map aggregates crashes into the same fixed grid tiles used by
@@ -342,11 +385,17 @@ Safety Hotspots, Fire & Rescue Proximity, and Police Breathalyzers tabs.
   magnitude. Outer-ring cells are physically larger than inner-ring cells, so
   the chart is not used for precise area comparison. Tooltips expose the exact
   weekday, hour, alcohol-related count, total crash count, and share on demand.
+- Weekday abbreviations are centred on their rings, while hour labels sit just
+  inside the outer ring to keep the left-side labels from being clipped. Inline
+  help and a caption state the ring and hour mapping rather than relying on
+  users to infer the radial structure.
 - Selecting a map cell filters the radial heatmap to that geography. Selecting
   a radial heatmap cell filters the map to that weekday and hour.
 - A single clear action resets both spatial and time selections, and the
   summary text always states whether the current context is countywide or a
   selected cell and time.
+- The clear action sits beside the map heading so the reset remains attached to
+  the linked view it affects without consuming a separate full-width row.
 - The time sequence runs from 06:00 through 05:00 so daytime/evening/night
   patterns read as one continuous daily cycle rather than splitting the night
   at midnight.

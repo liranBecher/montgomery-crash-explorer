@@ -801,8 +801,7 @@ def render_fire_rescue_visuals(
         st.caption(
             f"{len(filtered):,} filtered crashes · {len(visible_cells):,} visible cells · "
             f"{len(stations)} mapped stations · cell distances are medians of "
-            "crash-level shortest-road distances · Road network: "
-            "[© OpenStreetMap contributors](https://www.openstreetmap.org/copyright)"
+            "crash-level shortest-road distances."
         )
         render_map_legend(visible_cells, selected_station)
         map_key = f"fire_rescue_map_{map_generation}"
@@ -906,4 +905,5 @@ def render_fire_rescue_visuals(
     )
 
     if end_date.year == 2026:
-        st.caption("The 2026 source snapshot ends on August 5 and is incomplete for annual comparisons.")
+        st.caption("The 2026 source snapshot ends on August 5 and is incomplete for annual comparisons" \
+        " · Road network: [© OpenStreetMap contributors](https://www.openstreetmap.org/copyright)")
